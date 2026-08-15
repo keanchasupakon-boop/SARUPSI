@@ -1211,10 +1211,21 @@
   .auth-link b { color: var(--amber-deep); transition: 0.2s; }
   .auth-link b:hover { text-decoration: underline; }
 
-  /* ข้อความแจ้งเตือน (Validation) */
-  .auth-msg { font-size: 12.5px; font-weight: 600; padding: 10px; border-radius: 8px; margin-bottom: 16px; display: none; }
-  .auth-msg.error { background: #fbeee9; color: var(--coral); display: block; border-left: 4px solid var(--coral); }
-  .auth-msg.success { background: #eef5ef; color: var(--sage-deep); display: block; border-left: 4px solid var(--sage-deep); }
+ /* ข้อความแจ้งเตือน (Validation) อัปเกรดสีและแอนิเมชัน */
+  .auth-msg { 
+    font-size: 13.5px; font-weight: 600; padding: 12px 16px; border-radius: 10px; 
+    margin-bottom: 20px; display: none; align-items: center; gap: 8px;
+    animation: slideDownFade 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+  .auth-msg.error { background: #fbeee9; color: var(--coral); display: flex; border-left: 4px solid var(--coral); }
+  .auth-msg.success { background: #eef5ef; color: var(--sage-deep); display: flex; border-left: 4px solid var(--sage-deep); }
+  .auth-msg.warning { background: #fff8e6; color: var(--amber-deep); display: flex; border-left: 4px solid var(--amber); }
+  .auth-msg.info { background: #f0f4fa; color: var(--ink-700); display: flex; border-left: 4px solid var(--ink-600); }
+  
+  @keyframes slideDownFade {
+    0% { opacity: 0; transform: translateY(-10px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
 
   /* =========================================================
      👤 SAVED PROFILES (บัญชีที่เคยล็อกอิน)
@@ -1270,7 +1281,7 @@
       <div class="auth-link" onclick="switchAuthView('login')"><b>เข้าสู่ระบบด้วยบัญชีอื่น</b></div>
     </div>
 
-    <!-- 2. หน้า Login -->
+  <!-- 2. หน้า Login -->
     <div id="viewLogin" style="display: none;">
       <div class="auth-form">
         <div class="input-group">
@@ -1282,6 +1293,12 @@
           <input type="password" id="loginPwd" placeholder="กรอกรหัสผ่าน">
           <button class="eye-btn" onclick="togglePwd('loginPwd', this)">👁️</button>
         </div>
+        
+        <!-- เพิ่มปุ่มลืมรหัสผ่านตรงนี้ -->
+        <div style="text-align: right; margin-top: -8px;">
+          <span style="font-size: 12.5px; color: var(--text-faint); cursor: pointer; font-weight: 600; transition: 0.2s;" onmouseover="this.style.color='var(--amber-deep)'" onmouseout="this.style.color='var(--text-faint)'" onclick="forgotPassword()">ลืมรหัสผ่าน?</span>
+        </div>
+
         <button class="auth-btn" onclick="doLogin()">เข้าสู่ระบบ</button>
       </div>
       <div class="auth-link" onclick="switchAuthView('register')">ยังไม่ได้ลงทะเบียนใช่ไหม? <b>สร้างบัญชีใหม่</b></div>
@@ -2999,55 +3016,80 @@ setInterval(() => {
   toast('บันทึกข้อมูลอัตโนมัติ 💾');
 }, 180000); // 180000ms = 3 นาที
 
-// สั่งเริ่มทำงาน
 /* =========================================================
-   🔒 AUTHENTICATION LOGIC
+   ☁️ AUTHENTICATION LOGIC & CLOUD SYNC (FIREBASE)
 ========================================================= */
-let allUsers = JSON.parse(localStorage.getItem('sarupsi_users')) || [];
+// ดึงแค่ข้อมูลบัญชีที่ให้เครื่องนี้จำไว้ (ไม่ Sync ข้ามเครื่อง)
 let savedLogins = JSON.parse(localStorage.getItem('sarupsi_saved_logins')) || [];
-let activeUser = JSON.parse(localStorage.getItem('sarupsi_active_user')) || null;
+let activeUser = null; 
 
-// ซ่อน UI ของแอปหลักไว้ก่อน
 document.getElementById('app').style.display = 'none';
 
-function initAuth() {
-  if (activeUser) {
-    // ถ้าเคยล็อกอินค้างไว้ ให้เข้าแอปเลย
-    document.getElementById('authScreen').style.display = 'none';
-    document.getElementById('app').style.display = window.innerWidth <= 760 ? 'grid' : 'grid'; // คืนค่า Grid
-    
-    // อัปเดตข้อมูลโปรไฟล์ใน Sidebar
-    document.getElementById('appUserName').innerText = activeUser.name;
-    document.getElementById('appUserId').innerText = "ID: " + activeUser.id;
-    document.getElementById('appUserAvatar').src = activeUser.avatar;
-    
-    renderAll();
-  } else {
-    // ถ้ายังไม่ล็อกอิน โชว์หน้า Auth
-    document.getElementById('authScreen').style.display = 'flex';
-    document.getElementById('app').style.display = 'none';
-    
-    if (savedLogins.length > 0) {
-      switchAuthView('profiles');
-      renderSavedProfiles();
-    } else {
-      switchAuthView('login');
-      showAuthMsg('แนะนำ: ลงทะเบียนผู้ใช้ใหม่ก่อนเข้าใช้งานครับ', 'success');
-    }
-  }
-}
+// 1. 📡 ตัวรับสัญญาณ Cloud: ใครล็อกอินอยู่ ให้โหลดข้อมูลคนนั้นลงมา
+auth.onAuthStateChanged((user) => {
+  if (user) {
+    // 1.1 โหลดโปรไฟล์จาก Cloud
+    db.ref('users/' + user.uid + '/profile').once('value').then(snap => {
+      activeUser = snap.val();
+      if(!activeUser) return;
+      
+      document.getElementById('appUserName').innerText = activeUser.name;
+      document.getElementById('appUserId').innerText = "ID: " + activeUser.id;
+      document.getElementById('appUserAvatar').src = activeUser.avatar;
 
+      // 1.2 โหลดชีทสรุป (Data) ของคนนี้จาก Cloud ลงมาที่เครื่อง
+      db.ref('users/' + user.uid + '/data').once('value').then(dataSnap => {
+        const cloudData = dataSnap.val();
+        if (cloudData && cloudData.years) {
+          data = cloudData; 
+        } else {
+          data = { years: [] }; seed(); // ถ้าเพิ่งสมัครใหม่ ให้ใส่ข้อมูล Tutorial
+        }
+        
+        document.getElementById('authScreen').style.display = 'none';
+        document.getElementById('app').style.display = window.innerWidth <= 760 ? 'block' : 'grid';
+        renderAll();
+      });
+    });
+  } else {
+    // ถ้ายังไม่ล็อกอิน ให้โชว์หน้า Auth
+    activeUser = null;
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('authScreen').style.display = 'flex';
+    
+    if (savedLogins.length > 0) { switchAuthView('profiles'); renderSavedProfiles(); } 
+    else { switchAuthView('login'); }
+  }
+});
+
+// ฟังก์ชันแสดงข้อความแจ้งเตือน (แก้บั๊กแสดงผล + บังคับเล่นแอนิเมชันใหม่)
 function showAuthMsg(msg, type) {
   const msgBox = document.getElementById('authMsg');
+  let icon = '';
+  if (type === 'error') icon = '❌';
+  else if (type === 'success') icon = '✅';
+  else if (type === 'warning') icon = '⚠️';
+  else if (type === 'info') icon = '⏳';
+  
+  // 1. ซ่อนก่อนเพื่อรีเซ็ต
+  msgBox.style.display = 'none'; 
+  
+  // 2. ทริกหลอกเบราว์เซอร์ให้โหลดแอนิเมชันใหม่ (Trigger Reflow)
+  void msgBox.offsetWidth; 
+  
+  // 3. ใส่คลาสและข้อความ
   msgBox.className = `auth-msg ${type}`;
-  msgBox.innerText = msg;
+  msgBox.innerHTML = `<span>${icon}</span> <span style="line-height:1.4;">${msg}</span>`;
+  
+  // 4. สั่งให้โชว์ (ล้างค่าที่ถูกซ่อนไว้)
+  msgBox.style.display = 'flex'; 
 }
 
 function switchAuthView(view) {
   document.getElementById('viewProfiles').style.display = 'none';
   document.getElementById('viewLogin').style.display = 'none';
   document.getElementById('viewRegister').style.display = 'none';
-  document.getElementById('authMsg').style.display = 'none'; // ล้างข้อความเตือน
+  document.getElementById('authMsg').style.display = 'none'; 
 
   if (view === 'profiles') {
     document.getElementById('viewProfiles').style.display = 'block';
@@ -3063,203 +3105,116 @@ function switchAuthView(view) {
   }
 }
 
-// ระบบ เปิด/ปิด ตาดูรหัสผ่าน
 function togglePwd(inputId, btn) {
   const inp = document.getElementById(inputId);
-  if (inp.type === 'password') {
-    inp.type = 'text'; btn.innerText = '👁️‍🗨️';
-  } else {
-    inp.type = 'password'; btn.innerText = '👁️';
-  }
+  if (inp.type === 'password') { inp.type = 'text'; btn.innerText = '👁️‍🗨️'; } 
+  else { inp.type = 'password'; btn.innerText = '👁️'; }
 }
-// ==========================================
-// 🎨 AVATAR STUDIO (ระบบแต่งรูปโปรไฟล์)
-// ==========================================
-function openAvatarStudio() {
-  if (!activeUser) return;
-  
-  // ดึงข้อมูลรูปปัจจุบันมาเป็นค่าเริ่มต้น
-  let currentStyle = 'micah';
-  let currentSeed = activeUser.name;
-  let currentBg = 'fdfbf7';
-  
-  try {
-    const url = new URL(activeUser.avatar);
-    const pathParts = url.pathname.split('/');
-    currentStyle = pathParts[pathParts.length - 2] || 'micah';
-    currentSeed = url.searchParams.get('seed') || activeUser.name;
-    currentBg = url.searchParams.get('backgroundColor') || 'fdfbf7';
-  } catch(e) {}
 
-  const root = document.getElementById('modalRoot');
-  root.innerHTML = `
-    <div class="modal-overlay" id="ovlStudio" style="z-index: 10000; background: rgba(15,23,42,0.7); backdrop-filter: blur(4px);">
-      <div class="modal-box" style="width: 380px; text-align: center; border-radius: 24px; padding: 32px 24px;">
-        <h3 style="margin-bottom: 24px; font-size: 20px; color: var(--ink-900);">🎨 Avatar Studio</h3>
-        
-        <!-- Live Preview -->
-        <div id="avPreviewWrap" style="width: 140px; height: 140px; margin: 0 auto 24px; border-radius: 50%; box-shadow: 0 10px 30px rgba(0,0,0,0.15); overflow: hidden; border: 4px solid #fff; background: #${currentBg}; transition: background 0.3s;">
-          <img id="avPreview" src="${activeUser.avatar}" style="width:100%; height:100%; object-fit:cover;">
-        </div>
-        
-        <!-- แผงควบคุม (Controls) -->
-        <div style="text-align: left; display: flex; flex-direction: column; gap: 16px;">
-          
-          <div>
-            <label style="font-size: 13px; font-weight: 600; color: var(--text-soft); display:block; margin-bottom:6px;">1. เลือกลายเส้น (Art Style)</label>
-            <select id="avStyle" style="width: 100%; padding: 12px; border-radius: 12px; border: 2px solid var(--paper-line); font-family: 'Inter', 'Kanit', sans-serif; font-size: 14px; outline: none; cursor:pointer; background:#fff;">
-              <option value="micah" ${currentStyle==='micah'?'selected':''}>🧑 Micah (คนมินิมอล)</option>
-              <option value="avataaars" ${currentStyle==='avataaars'?'selected':''}>👤 Avataaars (คนสไตล์แอปเปิล)</option>
-              <option value="lorelei" ${currentStyle==='lorelei'?'selected':''}>🎀 Lorelei (การ์ตูนสีน้ำ)</option>
-              <option value="fun-emoji" ${currentStyle==='fun-emoji'?'selected':''}>😍 Fun Emoji (อิโมจิน่ารักๆ)</option>
-              <option value="bottts" ${currentStyle==='bottts'?'selected':''}>🤖 Bottts (หุ่นยนต์สุดเท่)</option>
-              <option value="adventurer" ${currentStyle==='adventurer'?'selected':''}>⚔️ Adventurer (สาย RPG)</option>
-            </select>
-          </div>
-          
-          <div>
-            <label style="font-size: 13px; font-weight: 600; color: var(--text-soft); display:block; margin-bottom:6px;">2. พิมพ์มั่วๆ เพื่อสุ่มหน้าตา (Magic Seed)</label>
-            <div style="display:flex; gap:8px;">
-              <input type="text" id="avSeed" value="${escapeHtml(currentSeed)}" style="flex:1; padding: 12px; border-radius: 12px; border: 2px solid var(--paper-line); font-family: inherit; font-size: 14px; outline: none;" placeholder="พิมพ์อะไรก็ได้...">
-              <button id="avDice" style="padding: 0 16px; border-radius: 12px; border: none; background: var(--amber); color:#fff; cursor: pointer; font-size:20px; transition:0.2s;" title="ทอยเต๋าสุ่มหน้า">🎲</button>
-            </div>
-          </div>
-          
-          <div>
-            <label style="font-size: 13px; font-weight: 600; color: var(--text-soft); display:block; margin-bottom:6px;">3. สีพื้นหลัง (Background Color)</label>
-            <input type="color" id="avBg" value="#${currentBg === 'transparent' ? 'ffffff' : currentBg}" style="width: 100%; height: 44px; border-radius: 12px; border: 2px solid var(--paper-line); cursor: pointer; padding: 2px; background:#fff;">
-          </div>
-          
-        </div>
-        
-        <div style="display:flex; gap:10px; margin-top: 32px;">
-          <button style="flex:1; background: var(--paper); border: none; padding: 14px; border-radius: 12px; font-weight: 600; color: var(--text-soft); cursor: pointer;" onclick="closeModal()">ยกเลิก</button>
-          <button style="flex:2; background: linear-gradient(135deg, #4f46e5, #818cf8); border: none; padding: 14px; border-radius: 12px; font-weight: 600; color: #fff; cursor: pointer; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);" id="saveAvatarBtn">✨ บันทึกโปรไฟล์</button>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  const styleSel = document.getElementById('avStyle');
-  const seedInp = document.getElementById('avSeed');
-  const bgInp = document.getElementById('avBg');
-  const preview = document.getElementById('avPreview');
-  const previewWrap = document.getElementById('avPreviewWrap');
-  
-  // ฟังก์ชันอัปเดตหน้าตาแบบ Real-time
-  const updatePreview = () => {
-    const style = styleSel.value;
-    const seed = encodeURIComponent(seedInp.value || 'smile');
-    const bg = bgInp.value.replace('#', '');
-    preview.src = `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}&backgroundColor=${bg}`;
-    previewWrap.style.backgroundColor = '#' + bg;
-  };
-  
-  styleSel.addEventListener('change', updatePreview);
-  seedInp.addEventListener('input', updatePreview);
-  bgInp.addEventListener('input', updatePreview);
-  
-  // ปุ่มทอยเต๋า สุ่ม Seed ตัวอักษรมั่วๆ
-  document.getElementById('avDice').onclick = () => {
-    seedInp.value = uid(); // ใช้ฟังก์ชันสุ่ม uid ของเรา
-    updatePreview();
-  };
-  
-  // กดปิดเมื่อคลิกพื้นหลังดำ
-  document.getElementById('ovlStudio').addEventListener('click', e => { if(e.target.id === 'ovlStudio') closeModal(); });
-  
-  // กดบันทึก (Save)
-  document.getElementById('saveAvatarBtn').onclick = () => {
-     activeUser.avatar = preview.src;
-     localStorage.setItem('sarupsi_active_user', JSON.stringify(activeUser));
-     
-     // อัปเดตในฐานข้อมูลผู้ใช้ทั้งหมด
-     const uIndex = allUsers.findIndex(u => u.id === activeUser.id);
-     if(uIndex !== -1) allUsers[uIndex].avatar = activeUser.avatar;
-     localStorage.setItem('sarupsi_users', JSON.stringify(allUsers));
-     
-     // อัปเดตใน Saved Profiles ของหน้า Login
-     const sIndex = savedLogins.findIndex(u => u.id === activeUser.id);
-     if(sIndex !== -1) savedLogins[sIndex].avatar = activeUser.avatar;
-     localStorage.setItem('sarupsi_saved_logins', JSON.stringify(savedLogins));
-     
-     // อัปเดตหน้าจอปัจจุบัน
-     document.getElementById('appUserAvatar').src = activeUser.avatar;
-     
-     closeModal();
-     toast('✨ อัปเดตโปรไฟล์น่ารักๆ เรียบร้อย!');
-  };
-}
-// ลงทะเบียน (อัปเกรด UX: สมัครเสร็จเข้าแอปเลย + ดัก ID ซ้ำ)
+// 2. 📝 ลงทะเบียน (ดักครบทุกกรณี)
 function doRegister() {
   const name = document.getElementById('regName').value.trim();
   const id = document.getElementById('regId').value.trim();
   const pwd = document.getElementById('regPwd').value;
   const pwdConfirm = document.getElementById('regPwdConfirm').value;
 
-  if (!name || !id || !pwd) return showAuthMsg('กรุณากรอกข้อมูลให้ครบถ้วน ⚠️', 'error');
-  if (pwd !== pwdConfirm) return showAuthMsg('รหัสผ่านไม่ตรงกัน กรุณาเช็กอีกครั้ง ⚠️', 'error');
+  // กรณี 1: ลืมกรอกข้อมูล (สีเหลือง)
+  if (!name || !id || !pwd) return showAuthMsg('กรุณากรอกข้อมูลให้ครบทุกช่องครับ', 'warning');
   
-  // UX Logic: ถ้าพิมพ์ ID ซ้ำกับที่มีอยู่ ให้เด้งกลับไปหน้าล็อกอินพร้อมกรอก ID ให้เลย
-  if (allUsers.find(u => u.id === id)) {
-    showAuthMsg('รหัสนี้ลงทะเบียนไปแล้ว! กำลังพากลับไปหน้าเข้าสู่ระบบ...', 'error');
-    setTimeout(() => {
-      switchAuthView('login');
-      document.getElementById('loginId').value = id;
-      document.getElementById('loginPwd').focus(); // เคอร์เซอร์รอที่ช่องรหัสผ่าน
-    }, 1800);
-    return;
-  }
-
-  // สร้างอวาตาร์น่ารักๆ อัตโนมัติตามชื่อ
+  // กรณี 2: รหัสผ่านสั้นเกินไป (สีเหลือง)
+  if (pwd.length < 6) return showAuthMsg('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', 'warning');
+  
+  // กรณี 3: พิมพ์รหัสยืนยันไม่ตรง (สีแดง)
+  if (pwd !== pwdConfirm) return showAuthMsg('รหัสผ่านไม่ตรงกัน กรุณาเช็กอีกครั้ง', 'error');
+  
+  const email = id + "@sarupsi.com"; 
   const avatar = `https://api.dicebear.com/7.x/micah/svg?seed=${encodeURIComponent(name)}&backgroundColor=fdfbf7`;
 
-  const newUser = { name, id, pwd, avatar };
-  allUsers.push(newUser);
-  localStorage.setItem('sarupsi_users', JSON.stringify(allUsers));
-  
-  // UX Logic: สมัครเสร็จปุ๊บ เข้าแอปให้ทันที ไม่ต้องกดซ้ำ!
-  showAuthMsg('🎉 ลงทะเบียนสำเร็จ! กำลังพาท่านเข้าสู่ระบบ...', 'success');
-  setTimeout(() => loginSuccess(newUser), 1200);
+  // กรณี 4: กำลังส่งข้อมูล (สีฟ้า)
+  showAuthMsg('กำลังสร้างบัญชีบน Cloud...', 'info');
+
+  auth.createUserWithEmailAndPassword(email, pwd)
+    .then((userCred) => {
+      const newUser = { name, id, avatar };
+      return db.ref('users/' + userCred.user.uid + '/profile').set(newUser);
+    })
+    .then(() => {
+      // กรณี 5: สมัครสำเร็จ (สีเขียว)
+      showAuthMsg('สมัครสำเร็จ! ยินดีต้อนรับสู่ SARUPSI 🎉', 'success');
+      // ไม่ต้องเขียนต่อ เพราะ onAuthStateChanged ด้านบนจะรับช่วงพาเข้าแอปเอง!
+    })
+    .catch((error) => {
+      // กรณี 6: พิมพ์ ID ที่เคยมีคนสมัครไว้แล้ว (สีแดง)
+      if(error.code === 'auth/email-already-in-use') {
+        showAuthMsg('รหัส ID นี้มีบัญชีอยู่แล้ว! กำลังพากลับไปหน้าเข้าสู่ระบบ...', 'error');
+        setTimeout(() => { switchAuthView('login'); document.getElementById('loginId').value = id; }, 2000);
+      } else {
+        showAuthMsg('เกิดข้อผิดพลาด: ' + error.message, 'error');
+      }
+    });
 }
 
-// ล็อกอิน (อัปเกรด UX: ถ้าใส่รหัสผิด เคลียร์ช่องรหัสให้พิมพ์ใหม่)
+// 3. 🔐 เข้าสู่ระบบ (ดักจากระบบของ Firebase โดยตรง)
 function doLogin() {
   const id = document.getElementById('loginId').value.trim();
   const pwd = document.getElementById('loginPwd').value;
+  
+  // กรณี 1: ลืมกรอกข้อมูล (สีเหลือง)
+  if (!id || !pwd) return showAuthMsg('กรุณากรอก ID และรหัสผ่าน', 'warning');
 
-  if (!id || !pwd) return showAuthMsg('กรุณากรอก ID และรหัสผ่าน ⚠️', 'error');
+  // กรณี 2: กำลังล็อกอิน (สีฟ้า)
+  showAuthMsg('กำลังตรวจสอบข้อมูล...', 'info');
+  const email = id + "@sarupsi.com";
 
-  const user = allUsers.find(u => u.id === id && u.pwd === pwd);
-  if (!user) {
-    document.getElementById('loginPwd').value = ''; // เคลียร์เฉพาะรหัสผ่านให้พิมพ์ใหม่
-    document.getElementById('loginPwd').focus();
-    return showAuthMsg('ID หรือ รหัสผ่านไม่ถูกต้อง ❌', 'error');
-  }
-
-  loginSuccess(user);
+  auth.signInWithEmailAndPassword(email, pwd)
+    .then((userCred) => {
+       // กรณี 3: รหัสถูก เข้าแอปสำเร็จ (สีเขียว)
+       showAuthMsg('เข้าสู่ระบบสำเร็จ! กำลังเตรียมข้อมูล...', 'success');
+       db.ref('users/' + userCred.user.uid + '/profile').once('value').then(snap => {
+         const pf = snap.val();
+         if(pf && !savedLogins.find(u => u.id === pf.id)) {
+           savedLogins.push({ id: pf.id, name: pf.name, avatar: pf.avatar });
+           localStorage.setItem('sarupsi_saved_logins', JSON.stringify(savedLogins));
+         }
+       });
+    })
+    .catch((error) => {
+      // ถ้ารหัสผิด ให้ล้างช่องรหัสรอให้พิมพ์ใหม่
+      document.getElementById('loginPwd').value = '';
+      document.getElementById('loginPwd').focus();
+      
+      // กรณี 4: รหัสผิด / ไม่มีบัญชีนี้ (สีแดง)
+      if(error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+         showAuthMsg('ID หรือรหัสผ่านไม่ถูกต้อง กรุณาลองใหม่', 'error');
+      } 
+      // กรณี 5: สแปมใส่รหัสผิดจนระบบล็อก (สีแดงเข้ม)
+      else if (error.code === 'auth/too-many-requests') {
+         showAuthMsg('ใส่รหัสผิดบ่อยเกินไป ระบบระงับชั่วคราว กรุณารอสักครู่ 🚫', 'error');
+      } else {
+         showAuthMsg('เข้าสู่ระบบไม่ได้: ' + error.message, 'error');
+      }
+    });
 }
-
-// กดจากรูปโปรไฟล์
+// ฟังก์ชันลืมรหัสผ่าน
+function forgotPassword() {
+  const id = document.getElementById('loginId').value.trim();
+  
+  if (!id) {
+    // ถ้ายังไม่ได้พิมพ์ ID ให้เตือนสีเหลือง
+    showAuthMsg('กรุณากรอกรหัสประจำตัว (ID) ก่อนกดลืมรหัสผ่านครับ 💡', 'warning');
+    document.getElementById('loginId').focus();
+  } else {
+    // ถ้าพิมพ์ ID แล้ว ให้ขึ้นสีฟ้าแนะนำการติดต่อ Admin
+    showAuthMsg(`บัญชี ${id}: เนื่องจากเป็นระบบภายใน กรุณาติดต่อ Admin (SUKI) เพื่อรีเซ็ตรหัสผ่านครับ 🛠️`, 'info');
+  }
+}
+// กดจากรูปโปรไฟล์ที่จำไว้
 function loginWithProfile(id) {
-  // เวลาคลิกรูป จะส่งไปหน้าล็อกอิน และกรอก ID ให้เลย ให้กรอกแค่รหัสผ่าน (เพื่อความปลอดภัย)
   switchAuthView('login');
   document.getElementById('loginId').value = id;
   document.getElementById('loginPwd').focus();
-  showAuthMsg('เพื่อความปลอดภัย กรุณากรอกรหัสผ่านครับ 🔐', 'success');
-}
-
-function loginSuccess(user) {
-  activeUser = user;
-  localStorage.setItem('sarupsi_active_user', JSON.stringify(activeUser));
-
-  // เซฟลงบัญชีที่เคยล็อกอิน (Saved Logins)
-  if (!savedLogins.find(u => u.id === user.id)) {
-    savedLogins.push({ id: user.id, name: user.name, avatar: user.avatar });
-    localStorage.setItem('sarupsi_saved_logins', JSON.stringify(savedLogins));
-  }
-
-  initAuth(); // รีเฟรชหน้าจอเข้าแอป
+  // กรณีเลือกโปรไฟล์ แนะนำด้วยสีฟ้า (ดูนุ่มนวลกว่าสีเขียว)
+  showAuthMsg(`บัญชี ${id}: กรุณากรอกรหัสผ่านเพื่อเข้าใช้งาน 🔐`, 'info');
 }
 
 function renderSavedProfiles() {
@@ -3277,23 +3232,122 @@ function renderSavedProfiles() {
 }
 
 function removeProfile(event, id) {
-  event.stopPropagation(); // กันไม่ให้กดทะลุไปล็อกอิน
+  event.stopPropagation();
   savedLogins = savedLogins.filter(u => u.id !== id);
   localStorage.setItem('sarupsi_saved_logins', JSON.stringify(savedLogins));
   if (savedLogins.length === 0) switchAuthView('login');
   else renderSavedProfiles();
 }
 
-// ล็อกเอาท์
+// 4. 🚪 ล็อกเอาท์
 function doLogout() {
-  activeUser = null;
-  localStorage.removeItem('sarupsi_active_user');
-  initAuth(); // เด้งกลับหน้าล็อกอิน
+  auth.signOut();
 }
 
-// แทนที่ renderAll() ด้านล่างสุดด้วยคำสั่งรันระบบ Auth
-// ลบ renderAll() อันเก่าทิ้งได้เลย แล้วใช้ 1 บรรทัดนี้แทน
-initAuth();
+// ==========================================
+// 🎨 AVATAR STUDIO (อัปเดตสไตล์และเซฟขึ้น Cloud)
+// ==========================================
+function openAvatarStudio() {
+  if (!activeUser) return;
+  
+  let currentStyle = 'micah', currentSeed = activeUser.name, currentBg = 'fdfbf7';
+  try {
+    const url = new URL(activeUser.avatar);
+    const pathParts = url.pathname.split('/');
+    currentStyle = pathParts[pathParts.length - 2] || 'micah';
+    currentSeed = url.searchParams.get('seed') || activeUser.name;
+    currentBg = url.searchParams.get('backgroundColor') || 'fdfbf7';
+  } catch(e) {}
+
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="modal-overlay" id="ovlStudio" style="z-index: 10000; background: rgba(15,23,42,0.7); backdrop-filter: blur(4px);">
+      <div class="modal-box" style="width: 380px; text-align: center; border-radius: 24px; padding: 32px 24px;">
+        <h3 style="margin-bottom: 24px; font-size: 20px; color: var(--ink-900);">🎨 Avatar Studio</h3>
+        <div id="avPreviewWrap" style="width: 140px; height: 140px; margin: 0 auto 24px; border-radius: 50%; box-shadow: 0 10px 30px rgba(0,0,0,0.15); overflow: hidden; border: 4px solid #fff; background: #${currentBg}; transition: background 0.3s;">
+          <img id="avPreview" src="${activeUser.avatar}" style="width:100%; height:100%; object-fit:cover;">
+        </div>
+        <div style="text-align: left; display: flex; flex-direction: column; gap: 16px;">
+          <div>
+            <label style="font-size: 13px; font-weight: 600; color: var(--text-soft); display:block; margin-bottom:6px;">1. เลือกลายเส้น (Art Style)</label>
+            <select id="avStyle" style="width: 100%; padding: 12px; border-radius: 12px; border: 2px solid var(--paper-line); font-family: 'Inter', 'Kanit', sans-serif; font-size: 14px; outline: none; cursor:pointer; background:#fff;">
+              <option value="micah" ${currentStyle==='micah'?'selected':''}>🧑 Micah (คนมินิมอล)</option>
+              <option value="avataaars" ${currentStyle==='avataaars'?'selected':''}>👤 Avataaars (คนสไตล์แอปเปิล)</option>
+              <option value="lorelei" ${currentStyle==='lorelei'?'selected':''}>🎀 Lorelei (การ์ตูนสีน้ำ)</option>
+              <option value="fun-emoji" ${currentStyle==='fun-emoji'?'selected':''}>😍 Fun Emoji (อิโมจิน่ารักๆ)</option>
+              <option value="bottts" ${currentStyle==='bottts'?'selected':''}>🤖 Bottts (หุ่นยนต์สุดเท่)</option>
+              <option value="adventurer" ${currentStyle==='adventurer'?'selected':''}>⚔️ Adventurer (สาย RPG)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 13px; font-weight: 600; color: var(--text-soft); display:block; margin-bottom:6px;">2. พิมพ์มั่วๆ เพื่อสุ่มหน้าตา (Magic Seed)</label>
+            <div style="display:flex; gap:8px;">
+              <input type="text" id="avSeed" value="${escapeHtml(currentSeed)}" style="flex:1; padding: 12px; border-radius: 12px; border: 2px solid var(--paper-line); font-family: inherit; font-size: 14px; outline: none;" placeholder="พิมพ์อะไรก็ได้...">
+              <button id="avDice" style="padding: 0 16px; border-radius: 12px; border: none; background: var(--amber); color:#fff; cursor: pointer; font-size:20px; transition:0.2s;" title="ทอยเต๋าสุ่มหน้า">🎲</button>
+            </div>
+          </div>
+          <div>
+            <label style="font-size: 13px; font-weight: 600; color: var(--text-soft); display:block; margin-bottom:6px;">3. สีพื้นหลัง (Background Color)</label>
+            <input type="color" id="avBg" value="#${currentBg === 'transparent' ? 'ffffff' : currentBg}" style="width: 100%; height: 44px; border-radius: 12px; border: 2px solid var(--paper-line); cursor: pointer; padding: 2px; background:#fff;">
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top: 32px;">
+          <button style="flex:1; background: var(--paper); border: none; padding: 14px; border-radius: 12px; font-weight: 600; color: var(--text-soft); cursor: pointer;" onclick="closeModal()">ยกเลิก</button>
+          <button style="flex:2; background: linear-gradient(135deg, #4f46e5, #818cf8); border: none; padding: 14px; border-radius: 12px; font-weight: 600; color: #fff; cursor: pointer; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);" id="saveAvatarBtn">✨ บันทึกโปรไฟล์</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const styleSel = document.getElementById('avStyle');
+  const seedInp = document.getElementById('avSeed');
+  const bgInp = document.getElementById('avBg');
+  const preview = document.getElementById('avPreview');
+  const previewWrap = document.getElementById('avPreviewWrap');
+  
+  const updatePreview = () => {
+    const style = styleSel.value;
+    const seed = encodeURIComponent(seedInp.value || 'smile');
+    const bg = bgInp.value.replace('#', '');
+    preview.src = `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}&backgroundColor=${bg}`;
+    previewWrap.style.backgroundColor = '#' + bg;
+  };
+  
+  styleSel.addEventListener('change', updatePreview);
+  seedInp.addEventListener('input', updatePreview);
+  bgInp.addEventListener('input', updatePreview);
+  
+  document.getElementById('avDice').onclick = () => { seedInp.value = uid(); updatePreview(); };
+  document.getElementById('ovlStudio').addEventListener('click', e => { if(e.target.id === 'ovlStudio') closeModal(); });
+  
+  document.getElementById('saveAvatarBtn').onclick = () => {
+     activeUser.avatar = preview.src;
+     
+     // อัปเดตขึ้น Cloud ทันที!
+     db.ref('users/' + auth.currentUser.uid + '/profile').update({ avatar: activeUser.avatar });
+     
+     const sIndex = savedLogins.findIndex(u => u.id === activeUser.id);
+     if(sIndex !== -1) {
+       savedLogins[sIndex].avatar = activeUser.avatar;
+       localStorage.setItem('sarupsi_saved_logins', JSON.stringify(savedLogins));
+     }
+     
+     document.getElementById('appUserAvatar').src = activeUser.avatar;
+     closeModal(); toast('✨ อัปเดตรูปโปรไฟล์ขึ้น Cloud เรียบร้อย!');
+  };
+}
+
+// ==========================================
+// 🔁 AUTO BACKUP CLOUD SYNC (ซิงค์ทุกๆ 5 วินาที)
+// ==========================================
+setInterval(() => {
+  if (auth.currentUser && data && data.years) {
+    db.ref('users/' + auth.currentUser.uid + '/data').set(data);
+    localStorage.setItem('sarupsi_sel', JSON.stringify(sel)); // จำหน้าสุดท้ายไว้ในเครื่อง
+  }
+}, 5000); 
+
+// หมายเหตุ: ไม่ต้องเรียกใช้ renderAll() ล่างสุดแล้ว เพราะระบบ onAuthStateChanged (ตัวรับสัญญาณข้อ 1) จะคอยจัดการเรียกให้เราเองครับ
 </script>
 </body>
 </html> 

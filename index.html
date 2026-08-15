@@ -3028,7 +3028,6 @@ document.getElementById('app').style.display = 'none';
 // 1. 📡 ตัวรับสัญญาณ Cloud: ใครล็อกอินอยู่ ให้โหลดข้อมูลคนนั้นลงมา
 auth.onAuthStateChanged((user) => {
   if (user) {
-    // 1.1 โหลดโปรไฟล์จาก Cloud
     db.ref('users/' + user.uid + '/profile').once('value').then(snap => {
       activeUser = snap.val();
       if(!activeUser) return;
@@ -3037,31 +3036,30 @@ auth.onAuthStateChanged((user) => {
       document.getElementById('appUserId').innerText = "ID: " + activeUser.id;
       document.getElementById('appUserAvatar').src = activeUser.avatar;
 
-      // 1.2 โหลดชีทสรุป (Data) ของคนนี้จาก Cloud ลงมาที่เครื่อง
       db.ref('users/' + user.uid + '/data').once('value').then(dataSnap => {
         const cloudData = dataSnap.val();
         if (cloudData && cloudData.years) {
           data = cloudData; 
         } else {
-          data = { years: [] }; seed(); // ถ้าเพิ่งสมัครใหม่ ให้ใส่ข้อมูล Tutorial
+          data = { years: [] }; seed(); 
         }
         
         document.getElementById('authScreen').style.display = 'none';
         document.getElementById('app').style.display = window.innerWidth <= 760 ? 'block' : 'grid';
         renderAll();
+        
+        // 🚀 เปิดใช้งานระบบ Real-time Listener ตรงนี้!
+        setupRealtimeSync(user.uid);
       });
     });
   } else {
-    // ถ้ายังไม่ล็อกอิน ให้โชว์หน้า Auth
     activeUser = null;
     document.getElementById('app').style.display = 'none';
     document.getElementById('authScreen').style.display = 'flex';
-    
     if (savedLogins.length > 0) { switchAuthView('profiles'); renderSavedProfiles(); } 
     else { switchAuthView('login'); }
   }
 });
-
 // ฟังก์ชันแสดงข้อความแจ้งเตือน (แก้บั๊กแสดงผล + บังคับเล่นแอนิเมชันใหม่)
 function showAuthMsg(msg, type) {
   const msgBox = document.getElementById('authMsg');
@@ -3352,7 +3350,7 @@ function triggerCloudSync() {
   }, 300); // 300 มิลลิวินาที = เร็วเกือบจะ Real-time โดยไม่หน่วงเครื่อง
 }
 
-// ผูกตัวดักฟัง (Listener) ข้อมูลจากเครื่องอื่นแบบสดๆ
+// ⚡ ตัวดักฟังข้อมูลแบบ Real-time (อัปเดตหน้าจอทันทีแบบอัตโนมัติ)
 function setupRealtimeSync(uid) {
   db.ref('users/' + uid + '/data').on('value', (snapshot) => {
     const cloudData = snapshot.val();
@@ -3360,14 +3358,16 @@ function setupRealtimeSync(uid) {
       const localStr = JSON.stringify(data);
       const cloudStr = JSON.stringify(cloudData);
       
-      // ถ้าข้อมูลบน Cloud ไม่ตรงกับเครื่องนี้ (แปลว่ามีเครื่องอื่นแก้) ให้ดึงข้อมูลใหม่มาแสดง
+      // ถ้าข้อมูลบน Cloud กับเครื่องนี้ไม่ตรงกัน (มีคนแก้จากเครื่องอื่น)
       if (localStr !== cloudStr) {
         data = cloudData;
-        // ถือว่าผู้ใช้อาจจะไม่ได้กำลังพิมพ์อยู่ ถึงจะรีเฟรชหน้าจออัตโนมัติป้องกันเคอร์เซอร์หลุด
-        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && !document.activeElement.isContentEditable) {
-          renderSidebar();
-          renderContent();
-        }
+        
+        // สั่งอัปเดต Sidebar และหน้าจอเนื้อหาทันที!
+        renderSidebar();
+        renderContent();
+        
+        // เด้ง Toast แจ้งเตือนเบาๆ ว่ามีการซิงค์ข้อมูลเข้ามา
+        toast("⚡ อัปเดตข้อมูลแบบเรียลไทม์แล้ว!");
       }
     }
   });

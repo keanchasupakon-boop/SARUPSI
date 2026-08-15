@@ -1,0 +1,3299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SARUPSI — by SUKI</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>  
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Kanit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+<style>
+  /* ปรับขนาดกระดาษ A4 ให้พอดีกับหน้าจอมือถือ */
+  @media (max-width: 760px) {
+    .note-body, .outline-container, .cornell-page {
+      padding: 24px 16px !important;
+      min-height: 800px !important;
+    }
+    .cornell-section { grid-template-columns: 1fr !important; } 
+    .cornell-cues-col { border-right: none !important; border-bottom: 2px solid rgba(193, 88, 76, 0.5) !important; }
+  }
+
+  :root{
+    --ink-900:#17233d;
+    --ink-800:#1f2f52;
+    --ink-700:#2c3e63;
+    --ink-600:#3d5480;
+    --paper:#f6f2ea;
+    --paper-raised:#fffdf8;
+    --paper-line:#e4dac9;
+    --amber:#d9a441;
+    --amber-deep:#b8842a;
+    --sage:#6b8f71;
+    --sage-deep:#516f57;
+    --coral:#c1584c;
+    --text:#20293b;
+    --text-soft:#5b6478;
+    --text-faint:#8a92a3;
+    --radius-s:6px;
+    --radius-m:10px;
+    --radius-l:16px;
+    --shadow-card:0 1px 2px rgba(23,35,61,.06), 0 6px 16px -8px rgba(23,35,61,.18);
+    --shadow-pop:0 12px 32px -8px rgba(23,35,61,.35);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:'Inter',system-ui,sans-serif;
+    color:var(--text);
+    background:var(--ink-900);
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{font-family:'Fraunces',Georgia,serif;}
+  ::selection{background:var(--amber);color:var(--ink-900);}
+  button{font-family:inherit;cursor:pointer;}
+  input,textarea{font-family:inherit;}
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:.09em;
+    text-transform:uppercase;
+    color:var(--text-faint);
+  }
+
+/* ===== APP SHELL ===== */
+  #app{
+    display:grid;
+    grid-template-columns:250px 1fr;
+    height:100vh;
+    overflow:hidden;
+    transition: grid-template-columns 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  #app.sidebar-collapsed {
+    grid-template-columns: 0px 1fr;
+  }
+
+  /* ===== SPINE (sidebar) ===== */
+  .spine{
+    background:linear-gradient(180deg,var(--ink-900),#101a30);
+    color:#dbe3f5;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    border-right:1px solid #0c1526;
+    position:relative;
+  }
+  .spine::after{
+    content:"";
+    position:absolute; top:0; right:0; bottom:0; width:10px;
+    background:repeating-linear-gradient(180deg,#0c1526 0 2px, transparent 2px 18px);
+    opacity:.5;
+  }
+  .brand{
+    padding:22px 20px 16px;
+    border-bottom:1px solid rgba(255,255,255,.08);
+  }
+  .brand .mark{
+    font-size:23px;
+    font-weight:700;
+    letter-spacing:.02em;
+    color:#fff;
+  }
+  .brand .mark span{color:var(--amber);}
+  .brand .by{
+    margin-top:2px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:#8290ad;
+  }
+  .years{
+    flex:1;
+    overflow-y:auto;
+    padding:14px 10px 90px;
+  }
+  .years::-webkit-scrollbar{width:6px;}
+  .years::-webkit-scrollbar-thumb{background:#2c3c60;border-radius:3px;}
+
+  .year-tab{
+    margin-bottom:8px;
+    border-radius:var(--radius-s);
+    overflow:hidden;
+  }
+  .year-tab-head{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:9px 10px;
+    border-radius:var(--radius-s);
+    background:rgba(255,255,255,.03);
+    border:1px solid rgba(255,255,255,.06);
+    cursor:pointer;
+    transition:background .15s;
+    position:relative;
+  }
+  .year-tab-head:hover{background:rgba(255,255,255,.07);}
+  .year-tab.active > .year-tab-head{
+    background:rgba(217,164,65,.14);
+    border-color:rgba(217,164,65,.35);
+  }
+  .year-tab-head .chev{
+    font-size:10px;
+    color:#8290ad;
+    transition:transform .15s;
+    flex-shrink:0;
+  }
+  .year-tab.open .year-tab-head .chev{transform:rotate(90deg);}
+  .year-tab-head .name{
+    flex:1;
+    font-size:13.5px;
+    font-weight:600;
+    color:#e8ecf7;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .year-tab-head .icon-btn{opacity:0;}
+  .year-tab-head:hover .icon-btn{opacity:1;}
+
+  .subjects{
+    display:none;
+    padding:4px 0 6px 18px;
+    border-left:1px dashed rgba(255,255,255,.12);
+    margin-left:14px;
+  }
+  .year-tab.open .subjects{display:block;}
+
+  .subject-item{margin:2px 0;}
+  .subject-head{
+    display:flex; align-items:center; gap:7px;
+    padding:7px 8px;
+    border-radius:var(--radius-s);
+    cursor:pointer;
+    transition:background .15s;
+  }
+  .subject-head:hover{background:rgba(255,255,255,.06);}
+  .subject-item.active > .subject-head{background:rgba(107,143,113,.22);}
+  .subject-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .subject-head .name{
+    flex:1; font-size:12.8px; color:#c9d2e6; font-weight:500;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .subject-head .chev{font-size:9px;color:#7181a0;transition:transform .15s;}
+  .subject-item.open .subject-head .chev{transform:rotate(90deg);}
+
+  .units{
+    display:none;
+    padding:2px 0 4px 15px;
+  }
+  .subject-item.open .units{display:block;}
+  .unit-item{
+    display:flex;align-items:center;gap:6px;
+    padding:6px 8px;
+    border-radius:var(--radius-s);
+    font-size:12.2px;
+    color:#a7b2ca;
+    cursor:pointer;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .unit-item:hover{background:rgba(255,255,255,.05);color:#dbe3f5;}
+  .unit-item.active{background:var(--amber);color:#211404;font-weight:600;}
+  .unit-item .icon-btn{opacity:0;}
+  .unit-item:hover .icon-btn{opacity:1;}
+
+  .icon-btn{
+    border:none;background:transparent;color:inherit;
+    width:20px;height:20px;border-radius:5px;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-size:13px;line-height:1;flex-shrink:0;
+    transition:background .12s;
+  }
+  .icon-btn:hover{background:rgba(255,255,255,.14);}
+  .unit-item.active .icon-btn:hover{background:rgba(0,0,0,.12);}
+
+  .add-row{
+    width:100%;
+    display:flex;align-items:center;gap:6px;
+    background:transparent;border:1px dashed rgba(255,255,255,.18);
+    color:#9aa5bd;
+    font-size:12px;
+    padding:6px 9px;border-radius:var(--radius-s);
+    margin-top:4px;
+    transition:.15s;
+  }
+  .add-row:hover{border-color:var(--amber);color:var(--amber);}
+
+  .spine-foot{
+    position:absolute; left:0; right:0; bottom:0;
+    padding:12px 14px;
+    background:linear-gradient(0deg,#101a30 70%,transparent);
+    display:flex;flex-direction:column;gap:6px;
+  }
+  .ghost-btn{
+    background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.1);
+    color:#c9d2e6;
+    font-size:11.5px;font-weight:500;
+    padding:8px 10px;border-radius:var(--radius-s);
+    display:flex;align-items:center;gap:7px;
+    transition:.15s;
+  }
+  .ghost-btn:hover{background:rgba(255,255,255,.12);}
+
+  /* ===== MAIN AREA ===== */
+  .binder{display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--paper);}
+  .topbar{
+    display:flex;align-items:center;gap:14px;
+    padding:14px 26px;
+    background:var(--paper-raised);
+    border-bottom:1px solid var(--paper-line);
+  }
+  .crumbtitle{flex:1;min-width:0;}
+  .crumbtitle .eyebrow{margin-bottom:2px;}
+  .crumbtitle h1{
+    font-size:21px;font-weight:600;margin:0;color:var(--ink-900);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .search-wrap{position:relative;width:260px;}
+  .search-wrap input{
+    width:100%;
+    padding:8px 12px 8px 32px;
+    border:1px solid var(--paper-line);
+    border-radius:999px;
+    background:var(--paper);
+    font-size:13px;color:var(--text);
+    outline:none;
+  }
+  .search-wrap input:focus{border-color:var(--amber);background:#fff;}
+  .search-wrap .sico{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--text-faint);}
+  .search-results{
+    position:absolute;top:calc(100% + 6px);left:0;right:0;
+    background:#fff;border:1px solid var(--paper-line);
+    border-radius:var(--radius-m);box-shadow:var(--shadow-pop);
+    max-height:340px;overflow-y:auto;z-index:50;
+  }
+  .search-results .sr-item{
+    padding:9px 13px;border-bottom:1px solid #f0ebe0;cursor:pointer;
+  }
+  .search-results .sr-item:last-child{border-bottom:none;}
+  .search-results .sr-item:hover{background:var(--paper);}
+  .search-results .sr-item .sr-path{font-size:10.5px;color:var(--text-faint);font-family:'JetBrains Mono',monospace;}
+  .search-results .sr-item .sr-title{font-size:13px;font-weight:600;color:var(--ink-900);}
+  .search-results .sr-empty{padding:16px;text-align:center;color:var(--text-faint);font-size:12.5px;}
+
+  .topbtn{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:8px 13px;border-radius:var(--radius-s);
+    border:1px solid var(--paper-line);background:var(--paper-raised);
+    font-size:12.5px;font-weight:600;color:var(--ink-700);
+    transition:.15s;
+  }
+  .topbtn:hover{border-color:var(--ink-700);}
+
+  .content{flex:1;overflow-y:auto;padding:26px 30px 60px;}
+  .content::-webkit-scrollbar{width:9px;}
+  .content::-webkit-scrollbar-thumb{background:#ddd1b8;border-radius:5px;}
+
+  /* empty states */
+  .empty-state{
+    height:100%;min-height:60vh;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;color:var(--text-soft);
+  }
+  .empty-state .big{font-size:46px;margin-bottom:6px;opacity:.7;}
+  .empty-state h2{margin:6px 0 4px;color:var(--ink-900);font-size:20px;}
+  .empty-state p{max-width:360px;font-size:13.5px;line-height:1.6;color:var(--text-soft);margin:0 0 14px;}
+
+  /* type tabs */
+  .type-tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;}
+  .type-tab{
+    padding:8px 15px;border-radius:999px;
+    border:1px solid var(--paper-line);background:var(--paper-raised);
+    font-size:12.5px;font-weight:600;color:var(--text-soft);
+    display:flex;align-items:center;gap:6px;
+    transition:.15s;
+  }
+  .type-tab:hover{border-color:var(--ink-600);}
+  .type-tab.active{background:var(--ink-900);border-color:var(--ink-900);color:#fff;}
+  .type-tab .tico{font-size:14px;}
+
+  .panel-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+  .panel-toolbar .newbtn{
+    background:var(--amber);border:none;color:#241605;font-weight:700;
+    padding:9px 16px;border-radius:var(--radius-s);font-size:12.5px;
+    box-shadow:0 3px 0 var(--amber-deep);
+    transition:transform .08s;
+  }
+  .panel-toolbar .newbtn:active{transform:translateY(2px);box-shadow:none;}
+
+  /* card grid for note/flashcard/outline list */
+  .item-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
+  .sum-card{
+    background:var(--paper-raised);
+    border:1px solid var(--paper-line);
+    border-radius:var(--radius-m);
+    padding:15px;cursor:pointer;
+    box-shadow:var(--shadow-card);
+    transition:transform .12s, box-shadow .12s;
+    display:flex;flex-direction:column;gap:6px;min-height:110px;
+    position:relative;
+  }
+  .sum-card:hover{transform:translateY(-2px);box-shadow:0 10px 22px -10px rgba(23,35,61,.3);}
+  .sum-card .sc-badge{
+    align-self:flex-start;font-size:9.5px;font-family:'JetBrains Mono',monospace;
+    padding:2px 7px;border-radius:5px;text-transform:uppercase;letter-spacing:.06em;
+  }
+  .sum-card .sc-title{font-weight:600;font-size:14.5px;color:var(--ink-900);line-height:1.3;}
+  .sum-card .sc-preview{font-size:12px;color:var(--text-soft);line-height:1.5;flex:1;
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+  .sum-card .sc-meta{font-size:10.5px;color:var(--text-faint);font-family:'JetBrains Mono',monospace;}
+  .sum-card .sc-del{
+    position:absolute;top:10px;right:10px;opacity:0;
+    width:22px;height:22px;border-radius:6px;border:none;background:#f4ece0;color:var(--coral);
+  }
+  .sum-card:hover .sc-del{opacity:1;}
+
+  /* ===== EDITOR SHELL ===== */
+  .editor-shell{background:var(--paper-raised);border:1px solid var(--paper-line);border-radius:var(--radius-l);box-shadow:var(--shadow-card);overflow:hidden;}
+  .editor-head{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--paper-line);}
+  .editor-head input.title-input{
+    flex:1;border:none;outline:none;background:transparent;
+    font-family:'Fraunces',serif;font-size:22px;font-weight:600;color:var(--ink-900);
+  }
+  .editor-head .back-btn{
+    border:none;background:var(--paper);color:var(--text-soft);
+    width:32px;height:32px;border-radius:50%;font-size:15px;flex-shrink:0;
+  }
+  .editor-head .back-btn:hover{background:var(--paper-line);}
+  .editor-head .del-btn{
+    border:none;background:#fbeee9;color:var(--coral);
+    padding:7px 12px;border-radius:var(--radius-s);font-size:12px;font-weight:600;flex-shrink:0;
+  }
+
+  /* note toolbar */
+  .toolbar{display:flex;flex-wrap:wrap;gap:3px;padding:10px 18px;border-bottom:1px solid var(--paper-line);background:#fbf8f2;}
+  .toolbar button{
+    border:none;background:transparent;color:var(--ink-700);
+    width:32px;height:30px;border-radius:6px;font-size:13.5px;
+  }
+  .toolbar button:hover{background:var(--paper-line);}
+  .toolbar .sep{width:1px;background:var(--paper-line);margin:3px 5px;}
+  .toolbar input[type=color]{width:28px;height:28px;border:none;background:none;padding:0;cursor:pointer;}
+
+  .note-body{
+    min-height:360px;padding:24px 26px;outline:none;
+    font-size:15px;line-height:1.75;color:var(--text);
+  }
+  .note-body:empty:before{content:attr(data-placeholder);color:var(--text-faint);}
+  .note-body pre{background:var(--ink-900);color:#e8ecf7;padding:12px 14px;border-radius:8px;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:13px;}
+  .note-body blockquote{border-left:3px solid var(--amber);margin:0;padding:2px 0 2px 14px;color:var(--text-soft);}
+  .note-body h2,.note-body h3{font-family:'Fraunces',serif;color:var(--ink-900);}
+  .note-body ul,.note-body ol{padding-left:22px;}
+
+  /* mind map */
+  .mm-toolbar{display:flex;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--paper-line);background:#fbf8f2;}
+  .mm-toolbar .hint{font-size:11.5px;color:var(--text-faint);margin-left:auto;}
+  .mm-toolbar button{
+    border:1px solid var(--paper-line);background:#fff;color:var(--ink-700);
+    padding:6px 11px;border-radius:var(--radius-s);font-size:12px;font-weight:600;
+  }
+  .mm-toolbar button:hover{border-color:var(--ink-700);}
+  .mm-viewport{height:520px;overflow:auto;position:relative;background:var(--paper);
+    background-image:radial-gradient(circle,#ddd1b8 1px,transparent 1px);background-size:22px 22px;
+    cursor:grab;}
+  .mm-viewport.panning{cursor:grabbing;}
+  .mm-viewport.panning .mm-node{pointer-events:none;}
+  .mm-canvas{position:relative;width:2200px;height:1500px;}
+  .mm-canvas svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}
+  .mm-canvas svg path{fill:none;stroke:#b9ad91;stroke-width:2;}
+  .mm-node{
+    position:absolute;min-width:120px;max-width:220px;
+    padding:10px 14px;border-radius:14px;
+    font-size:13px;font-weight:600;color:#241605;
+    box-shadow:0 3px 8px rgba(23,35,61,.15);
+    cursor:grab;user-select:none;border:2px solid rgba(0,0,0,.06);
+    line-height:1.35;
+  }
+  .mm-node.root{font-family:'Fraunces',serif;font-size:16px;text-align:center;border-radius:16px;}
+  .mm-node:active{cursor:grabbing;}
+  .mm-node.selected{outline:2px solid var(--ink-900);outline-offset:2px;}
+  .mm-node .txt{outline:none;}
+  .mm-node .ctrl{
+    position:absolute;top:-13px;right:-10px;display:none;gap:3px;
+  }
+  .mm-node:hover .ctrl,.mm-node.selected .ctrl{display:flex;}
+  .mm-node .ctrl button{
+    width:22px;height:22px;border-radius:50%;border:1px solid rgba(0,0,0,.15);
+    background:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;color:#333;
+  }
+
+  /* flashcards */
+  .fc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;}
+  .fc-card{perspective:1200px;height:150px;}
+  .fc-inner{position:relative;width:100%;height:100%;transition:transform .5s;transform-style:preserve-3d;}
+  .fc-card.flipped .fc-inner{transform:rotateY(180deg);}
+  .fc-face{
+    position:absolute;inset:0;backface-visibility:hidden;
+    border-radius:var(--radius-m);padding:14px;
+    display:flex;flex-direction:column;
+    border:1px solid var(--paper-line);box-shadow:var(--shadow-card);
+  }
+  .fc-front{background:var(--paper-raised);}
+  .fc-back{background:var(--ink-900);color:#fff;transform:rotateY(180deg);}
+  .fc-face .fc-label{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);margin-bottom:6px;}
+  .fc-back .fc-label{color:#8290ad;}
+  .fc-face [contenteditable]{outline:none;flex:1;font-size:13.5px;line-height:1.5;overflow-y:auto;}
+  .fc-actions{display:flex;gap:6px;margin-top:8px;justify-content:flex-end;}
+  .fc-actions button{width:24px;height:24px;border-radius:6px;border:none;background:rgba(0,0,0,.06);font-size:12px;}
+  .fc-back .fc-actions button{background:rgba(255,255,255,.12);color:#fff;}
+  .fc-add-card{
+    border:2px dashed var(--paper-line);border-radius:var(--radius-m);
+    display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;
+    color:var(--text-faint);font-size:12.5px;font-weight:600;height:150px;background:transparent;
+  }
+  .fc-add-card:hover{border-color:var(--amber);color:var(--amber-deep);}
+
+/* =========================================================
+     ≡ PRO OUTLINE EDITOR (UI/UX REVAMP)
+  ========================================================= */
+  .outline-wrap { padding: 32px 0; flex: 1; overflow-y: auto; background: var(--paper); }
+  .dark-mode .outline-wrap { background: var(--ink-900); }
+  
+  /* กระดาษ A4 พื้นหลัง Outline */
+  .outline-container {
+    width: 800px; max-width: 95%; margin: 0 auto 32px;
+    background: #fff; padding: 40px 48px; border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08); min-height: 800px;
+  }
+  .dark-mode .outline-container { background: var(--ink-800); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+
+  .ol-row {
+    display: flex; align-items: flex-start; gap: 6px; padding: 6px 8px;
+    position: relative; transition: background 0.2s; border-radius: 8px;
+    margin-bottom: 2px;
+  }
+  .ol-row:hover { background: rgba(0,0,0,0.03); }
+  .dark-mode .ol-row:hover { background: rgba(255,255,255,0.04); }
+  
+  /* เส้นไกด์ไลน์ (Tree Lines) */
+  .ol-guide {
+    position: absolute; top: 32px; bottom: -8px;
+    border-left: 2px solid var(--paper-line); z-index: 1;
+  }
+
+  /* กลุ่มปุ่มคุมด้านหน้า (จับลาก, พับ, จุด Bullet) */
+  .ol-controls {
+    display: flex; align-items: center; justify-content: flex-end; gap: 2px; 
+    margin-top: 2px; width: 50px; flex-shrink: 0;
+  }
+
+  .ol-collapse {
+    width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: var(--text-faint); cursor: pointer;
+    border-radius: 4px; background: transparent; border: none; transition: 0.2s;
+  }
+  .ol-collapse:hover { background: rgba(0,0,0,0.08); color: var(--ink-900); }
+  .ol-collapse.hidden { opacity: 0; pointer-events: none; }
+  .ol-collapse.is-collapsed { transform: rotate(-90deg); color: var(--amber-deep); }
+
+  .ol-drag {
+    width: 14px; height: 20px; display: flex; align-items: center; justify-content: center;
+    color: #cbd5e1; cursor: grab; opacity: 0; font-size: 14px; letter-spacing: -2px;
+    user-select: none; transition: 0.2s;
+  }
+  .ol-row:hover .ol-drag { opacity: 1; color: var(--text-faint); }
+  .ol-drag:active { cursor: grabbing; color: var(--amber-deep); }
+
+  .ol-bullet-btn {
+    width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+    color: var(--ink-700); font-size: 26px; cursor: pointer; 
+    background: transparent; border: none; transition: 0.2s; line-height: 0;
+  }
+  .ol-bullet-btn:hover { transform: scale(1.3); color: var(--amber-deep); }
+  
+  .ol-checkbox {
+    width: 16px; height: 16px; border: 2px solid var(--text-soft); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    transition: 0.2s; color: transparent; font-size: 11px; font-weight: bold;
+  }
+  .ol-checkbox.checked { background: var(--sage); border-color: var(--sage); color: #fff; }
+
+  /* ช่องกรอกข้อความ */
+  .ol-text {
+    flex: 1; border: none; outline: none; background: transparent;
+    font-size: 16px; color: var(--text); line-height: 1.6;
+    min-height: 26px; word-break: break-word; font-family: 'Inter', 'Kanit', sans-serif;
+  }
+  .ol-text[data-checked="true"] { color: var(--text-faint); text-decoration: line-through; opacity: 0.6; }
+  .ol-text:empty:before { content: attr(data-placeholder); color: var(--text-faint); pointer-events: none; }
+  
+  /* กลุ่มปุ่มด้านหลัง (ลบ, เลื่อนหน้า) */
+  .ol-btns { display: flex; gap: 4px; opacity: 0; flex-shrink: 0; margin-top: 2px; transition: 0.2s; }
+  .ol-row:hover .ol-btns { opacity: 1; }
+  .ol-btns button { width: 26px; height: 26px; border-radius: 6px; border: none; background: var(--paper); color: var(--text-soft); font-size: 12px; cursor: pointer; transition: 0.2s; }
+  .ol-btns button:hover { background: var(--paper-line); color: var(--ink-900); }
+  .dark-mode .ol-btns button { background: transparent; }
+  .dark-mode .ol-btns button:hover { background: var(--ink-700); color: #fff; }
+  
+  .ol-row.dragging { opacity: 0.4; background: var(--paper-line); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+  /* ปุ่มสร้างหัวข้อใหม่ */
+  .ol-add {
+    margin-top: 16px; margin-left: 64px; font-size: 14px; font-weight: 600; color: var(--text-faint);
+    border: 2px dashed var(--paper-line); padding: 10px 20px; border-radius: 8px;
+    background: transparent; cursor: pointer; transition: 0.2s; display: inline-block;
+    font-family: 'Prompt', sans-serif;
+  }
+  .ol-add:hover { border-color: var(--amber); color: var(--amber-deep); background: rgba(217, 164, 65, 0.05); }
+
+  /* แก้บั๊ก Floating Menu ให้แสดงผลถูกต้อง */
+  #floatingMenuOutline {
+    position: fixed; top: -100px; left: -100px; background: var(--ink-900); 
+    padding: 6px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); 
+    display: flex; gap: 4px; z-index: 1000; opacity: 0; pointer-events: none; 
+    transition: opacity 0.2s, transform 0.2s; transform: translateY(10px);
+  }
+  #floatingMenuOutline.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  #floatingMenuOutline button {
+    background: transparent; color: #fff; border: none; padding: 6px 12px;
+    border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer;
+    font-family: 'Inter', 'Kanit', sans-serif; display: flex; align-items: center; gap: 6px;
+  }
+  #floatingMenuOutline button:hover { background: rgba(255,255,255,0.2); }
+
+  /* ===== MODAL ===== */
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(17,24,39,.55);
+    display:flex;align-items:center;justify-content:center;z-index:200;
+    backdrop-filter:blur(2px);
+  }
+  .modal-box{
+    background:#fff;border-radius:var(--radius-l);padding:22px 24px;width:340px;
+    box-shadow:var(--shadow-pop);
+  }
+  .modal-box h3{margin:0 0 4px;font-size:17px;color:var(--ink-900);}
+  .modal-box p.msg{font-size:13px;color:var(--text-soft);line-height:1.5;margin:6px 0 14px;}
+  .modal-field{margin:12px 0;}
+  .modal-field label{font-size:11.5px;font-weight:600;color:var(--text-soft);display:block;margin-bottom:5px;}
+  .modal-field input,.modal-field select{
+    width:100%;padding:9px 11px;border:1px solid var(--paper-line);border-radius:var(--radius-s);
+    font-size:13.5px;outline:none;
+  }
+  .modal-field input:focus{border-color:var(--ink-700);}
+  .swatch-row{display:flex;gap:8px;margin-top:4px;}
+  .swatch-row .sw{width:24px;height:24px;border-radius:50%;border:2px solid transparent;cursor:pointer;}
+  .swatch-row .sw.on{border-color:var(--ink-900);}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+  .btn-cancel{background:var(--paper);border:1px solid var(--paper-line);padding:8px 14px;border-radius:var(--radius-s);font-size:12.5px;font-weight:600;color:var(--text-soft);}
+  .btn-primary{background:var(--ink-900);border:none;padding:8px 16px;border-radius:var(--radius-s);font-size:12.5px;font-weight:600;color:#fff;}
+  .btn-danger{background:var(--coral);border:none;padding:8px 16px;border-radius:var(--radius-s);font-size:12.5px;font-weight:600;color:#fff;}
+
+  .toast{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(10px);
+    background:var(--ink-900);color:#fff;padding:10px 18px;border-radius:999px;
+    font-size:12.5px;font-weight:500;box-shadow:var(--shadow-pop);
+    opacity:0;pointer-events:none;transition:.25s;z-index:300;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  @media (max-width:760px){
+    #app{grid-template-columns:1fr;}
+    .spine{position:fixed;left:0;top:0;bottom:0;width:250px;z-index:100;transform:translateX(-100%);transition:.2s;}
+    .spine.open{transform:translateX(0);}
+    .search-wrap{display:none;}
+  }
+/* Dark Mode Variables */
+  body.dark-mode {
+    --ink-900: #0f172a; --ink-800: #1e293b; --ink-700: #334155; --paper: #1e293b;
+    --paper-raised: #0f172a; --paper-line: #334155; --text: #f8fafc; --text-soft: #cbd5e1;
+  }
+  @media print {
+    .spine, .topbar, .panel-toolbar, .toolbar, .mm-toolbar, #olAdd, .editor-head { display: none !important; }
+    .binder, .content, .editor-shell { background: white !important; height: auto !important; overflow: visible !important; border: none !important; box-shadow: none !important; }
+  }
+/* =========================================================
+     🔥 UI/UX OVERHAUL: GRADIENT & BOUNCY MOTION 🔥
+  ========================================================= */
+
+  /* 1. สร้างตัวแปรความเด้ง (Bouncy) และ Gradient สวยๆ */
+  :root {
+    /* ค่านี้คือหัวใจของความ "เด้ง" ลองเอาไปใช้กับแอปอื่นได้เลย! */
+    --bounce: cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+    --smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Gradients */
+/* Gradients (เปลี่ยนเป็นสี Soft Indigo สบายตา) */
+    --grad-primary: linear-gradient(135deg, #4f46e5, #818cf8);    --grad-dark: linear-gradient(135deg, var(--ink-900), var(--ink-700));
+    --grad-sidebar: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+    --grad-glass: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0));
+  }
+
+  /* 2. แต่ง Sidebar และโลโก้ให้ดูแพง (Gradient Text) */
+  .spine {
+    background: var(--grad-sidebar) !important;
+  }
+  .brand .mark {
+    background: linear-gradient(to right, var(--amber), #f472b6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 26px;
+  }
+
+  /* 3. การ์ดต่างๆ (Cards) ให้มีเอฟเฟกต์ลอยขึ้นและเด้งตอบสนองตอนเอาเมาส์ชี้ */
+  .sum-card, .fc-card {
+    transition: transform 0.4s var(--bounce), box-shadow 0.4s var(--bounce), border-color 0.3s ease !important;
+  }
+  .sum-card:hover {
+    transform: translateY(-8px) scale(1.02) !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+    border-color: var(--amber) !important;
+  }
+
+  /* 4. ปุ่มทุกปุ่มในระบบ ต้องกดยุบ (Scale down) และเด้งคืน */
+  button {
+    transition: transform 0.2s var(--bounce), background 0.3s var(--smooth), box-shadow 0.3s var(--smooth), opacity 0.2s !important;
+  }
+  button:active {
+    transform: scale(0.92) !important; /* กดยุบตัวลง 8% */
+  }
+
+/* 5. ปุ่มหลัก (Primary Buttons) ใส่ Gradient และ Glow Effect */
+  .newbtn, #studyBtn, .btn-primary {
+    background: var(--grad-primary) !important;
+    color: #fff !important;
+    border: none !important;
+    box-shadow: 0 4px 15px rgba(79, 70, 229, 0.35) !important;
+  }
+  .newbtn:hover, #studyBtn:hover, .btn-primary:hover {
+    box-shadow: 0 8px 25px rgba(79, 70, 229, 0.5) !important;
+    transform: translateY(-3px) scale(1.05) !important;
+    filter: brightness(1.1);
+  }
+
+  /* 6. แอนิเมชันเปิดหน้าต่าง Modal (เด้งดึ๋งเข้ามาแบบ Pop-in) */
+  @keyframes modalPop {
+    0% { transform: scale(0.8); opacity: 0; }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .modal-box {
+    animation: modalPop 0.5s var(--bounce) forwards !important;
+    background: linear-gradient(180deg, #ffffff, #fdfbf7);
+  }
+  .dark-mode .modal-box {
+    background: linear-gradient(180deg, var(--ink-800), var(--ink-900));
+  }
+
+  /* 7. แอนิเมชัน Toast (แจ้งเตือนลอยขึ้นมาแล้วเด้งนิดๆ) */
+  .toast {
+    transition: transform 0.5s var(--bounce), opacity 0.4s ease !important;
+  }
+  .toast.show {
+    transform: translateX(-50%) translateY(-30px) scale(1.05) !important; /* ให้เด้งขึ้นมาสูงกว่าเดิมนิดนึง */
+    background: var(--grad-dark) !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3) !important;
+  }
+
+  /* 8. แอนิเมชันเวลาเข้าหน้าใหม่ ให้ Card ค่อยๆ สไลด์ขึ้นมา (Staggered Fade Up) */
+  @keyframes slideUpFade {
+    0% { transform: translateY(30px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+  .sum-card, .fc-card {
+    animation: slideUpFade 0.6s var(--bounce) backwards;
+  }
+  /* ทำให้มันทยอยเด้งขึ้นมาทีละอัน */
+  .sum-card:nth-child(1) { animation-delay: 0.05s; }
+  .sum-card:nth-child(2) { animation-delay: 0.1s; }
+  .sum-card:nth-child(3) { animation-delay: 0.15s; }
+  .sum-card:nth-child(4) { animation-delay: 0.2s; }
+  .sum-card:nth-child(5) { animation-delay: 0.25s; }
+  .sum-card:nth-child(n+6) { animation-delay: 0.3s; }
+
+  /* 9. แต่งกล่อง Search ให้ดู Modern ขึ้น (Glassmorphism นิดๆ) */
+  .search-wrap input {
+    transition: all 0.3s var(--bounce) !important;
+  }
+  .search-wrap input:focus {
+    transform: scale(1.05);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+  }
+/* =========================================================
+     ✨ TYPOGRAPHY UPGRADE: KANIT FOR THAI ✨
+  ========================================================= */
+  
+  /* 1. ฟอนต์หลัก (UI, ปุ่ม, เมนู): ใช้ Inter (อิ้ง) + Kanit (ไทย) */
+  body, input, textarea, button, .search-wrap input {
+    font-family: 'Inter', 'Kanit', sans-serif !important;
+    letter-spacing: 0.2px; 
+  }
+
+  /* 2. หัวข้อทั้งหมด: ใช้ Inter + Kanit แบบตัวหนา */
+  h1, h2, h3, .display, .brand .mark, .sc-title, .modal-box h3 {
+    font-family: 'Inter', 'Kanit', sans-serif !important;
+    font-weight: 600;
+  }
+
+  /* 3. ส่วนเนื้อหาโน้ตทั้งหมด: ใช้ Inter (อิ้ง) + Kanit (ไทย) */
+  .note-body, .fc-face [contenteditable], .ol-text {
+    font-family: 'Inter', 'Kanit', sans-serif !important;
+    font-size: 16px !important; 
+    line-height: 1.8 !important; 
+  }
+
+  /* 4. ปรับขนาดตัวอักษรของปุ่มและ Tab ให้พอดีกับทรงฟอนต์ */
+  .type-tab, .ghost-btn, .add-row {
+    font-size: 13.5px !important;
+  }
+  .unit-item {
+    font-size: 14px !important;
+  }
+  
+  /* 5. ฟอนต์โค้ดและ Eyebrow คงความเป็น Monospace */
+  .eyebrow, .note-body pre, .sc-meta, .sr-path {
+    font-family: 'JetBrains Mono', monospace !important;
+  }
+  
+  /* 6. ปรับฟอนต์ป้ายกำกับ Flashcard */
+  .fc-label {
+    font-family: 'Inter', 'Kanit', sans-serif !important;
+    font-weight: 600 !important;
+    letter-spacing: 0px !important;
+    text-transform: none !important; 
+  }
+/* =========================================================
+     📁 FOLDER VIEW UI (ระบบแฟ้ม 3 มิติ)
+  ========================================================= */
+  .folder-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 32px 24px;
+    margin-top: 24px;
+    padding-bottom: 40px;
+  }
+  .folder-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    text-align: center;
+    transition: transform 0.3s var(--bounce);
+    animation: slideUpFade 0.5s var(--bounce) backwards;
+  }
+  .folder-card:nth-child(1) { animation-delay: 0.05s; }
+  .folder-card:nth-child(2) { animation-delay: 0.1s; }
+  .folder-card:nth-child(3) { animation-delay: 0.15s; }
+  .folder-card:hover {
+    transform: translateY(-8px) scale(1.05);
+  }
+  
+  /* ตัวแฟ้ม */
+  .folder-icon {
+    width: 100px;
+    height: 75px;
+    background: var(--ink-700); 
+    border-radius: 0 10px 10px 10px; /* โค้งเฉพาะขวาและล่าง */
+    position: relative;
+    margin-bottom: 14px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+    transition: all 0.3s ease;
+  }
+  /* แท็บแฟ้มด้านบนซ้าย */
+  .folder-icon::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 0;
+    width: 45px;
+    height: 12px;
+    background: inherit;
+    border-radius: 8px 8px 0 0;
+    filter: brightness(0.92); /* สีเข้มกว่าตัวแฟ้มนิดนึง */
+  }
+  /* กระดาษที่เสียบอยู่ในแฟ้ม (สร้างมิติ) */
+  .folder-icon::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    right: 4px;
+    left: 4px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 6px 6px 0 0;
+    z-index: 1;
+  }
+  
+  /* กล่องสร้างแฟ้มใหม่ */
+  .folder-add {
+    background: transparent !important;
+    border: 3px dashed var(--paper-line);
+    box-shadow: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: var(--text-faint);
+    border-radius: 12px !important;
+  }
+  .folder-add::before, .folder-add::after { display: none; }
+  .folder-add:hover { border-color: var(--amber); color: var(--amber); }
+/* ปุ่มแก้ไข/ลบ บนแฟ้ม (โผล่ตอน Hover) */
+/* ปุ่มแก้ไข/ลบ บนแฟ้ม (โผล่ตอน Hover) */
+  .folder-actions {
+    position: absolute; top: -10px; right: -14px; /* ขยับให้ลอยอยู่บนมุมขวาของตัวแฟ้มเป๊ะๆ */
+    display: flex; gap: 4px; opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    transform: translateY(4px);
+    z-index: 10;
+  }
+  .folder-card:hover .folder-actions, .sum-card:hover .folder-actions { opacity: 1; transform: translateY(0); }
+  .folder-btn {
+    width: 28px; height: 28px; border-radius: 6px; border: none;
+    background: rgba(255,255,255,0.95); color: var(--ink-700);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    font-size: 13px; transition: 0.2s;
+  }
+  .folder-btn:hover { background: #fff; color: var(--amber-deep); transform: scale(1.1); }
+  .folder-btn.del-btn { color: var(--coral); }
+  .folder-btn.del-btn:hover { background: var(--coral); color: white; }
+  /* ข้อความใต้แฟ้ม */
+  .folder-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-900);
+    width: 100%;
+    word-break: break-word;
+    line-height: 1.3;
+  }
+  .folder-meta {
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  
+  /* รองรับ Dark Mode */
+  .dark-mode .folder-name { color: #fff; }
+  .dark-mode .folder-add { border-color: var(--ink-700); }  
+/* =========================================================
+     📄 A4 PAPER & EDITOR TABS & EDITOR FEATURES
+  ========================================================= */
+  
+  /* 1. แถบสลับโน้ต (Tabs) ด้านบนสุด */
+  .editor-tabs {
+    display: flex; gap: 4px; overflow-x: auto;
+    background: var(--paper); padding: 10px 16px 0;
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .dark-mode .editor-tabs { background: var(--ink-900); }
+  .editor-tab {
+    padding: 8px 16px; font-size: 13.5px; font-weight: 600;
+    color: var(--text-soft); background: rgba(0,0,0,0.03);
+    border-radius: 8px 8px 0 0; cursor: pointer;
+    border: 1px solid transparent; border-bottom: none;
+    white-space: nowrap; transition: 0.2s;
+  }
+  .editor-tab:hover { background: rgba(0,0,0,0.06); }
+  .editor-tab.active {
+    background: var(--paper-raised); color: var(--amber-deep);
+    border-color: var(--paper-line);
+  }
+  .dark-mode .editor-tab.active { background: var(--ink-800); }
+
+  /* 2. พื้นหลังกระดาษ A4 เสมือนจริง */
+  .note-paper-wrap {
+    background: var(--paper); padding: 32px 0;
+    overflow-y: auto; flex: 1;
+  }
+  .dark-mode .note-paper-wrap { background: var(--ink-900); }
+  
+  .note-body {
+    width: 794px; /* ความกว้างมาตรฐาน A4 (96dpi) */
+    max-width: 95%; margin: 0 auto;
+    min-height: 1123px; /* ความสูงมาตรฐาน A4 ต่อ 1 หน้า */
+    background-color: #fff;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    padding: 40px 48px !important; outline: none;
+    /* สร้างเส้นประสีแดงบอกขอบหน้า A4 ทุกๆ 1123px */
+    background-image: repeating-linear-gradient(to bottom, transparent, transparent 1122px, rgba(193, 88, 76, 0.6) 1122px, rgba(193, 88, 76, 0.6) 1124px);
+    background-size: 100% 1124px;
+    border-radius: 4px;
+  }
+  .dark-mode .note-body {
+    background-color: var(--ink-800); box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    background-image: repeating-linear-gradient(to bottom, transparent, transparent 1122px, rgba(244, 114, 182, 0.6) 1122px, rgba(244, 114, 182, 0.6) 1124px);
+  }
+
+  /* 3. ตกแต่ง Hyperlink ใน Note ให้เป็นสีฟ้าขีดเส้นใต้ */
+  .note-body a {
+    color: #3b82f6; text-decoration: underline; cursor: pointer;
+  }  
+/* =========================================================
+     📑 CORNELL NOTES UI (Block-based & Paginated)
+  ========================================================= */
+  .cornell-wrap {
+    padding: 32px 0; background: var(--paper); flex: 1; overflow-y: auto;
+  }
+  .dark-mode .cornell-wrap { background: var(--ink-900); }
+  
+  /* กระดาษ A4 ทีละหน้า */
+  .cornell-page {
+    width: 794px; max-width: 95%; margin: 0 auto 32px;
+    background: #fff; border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    display: flex; flex-direction: column;
+    min-height: 1123px; /* ความสูง A4 ขั้นต่ำ */
+    position: relative; overflow: hidden;
+  }
+  .dark-mode .cornell-page { background: var(--ink-800); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+
+  /* ลายน้ำบอกเลขหน้า */
+  .cornell-page-num {
+    position: absolute; top: 12px; right: 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--text-faint); font-weight: bold;
+  }
+  
+  /* ตัวคุม Sections (เนื้อหาจะขยายตัวดัน Summary ลงไปข้างล่าง) */
+  .cornell-body { flex: 1; display: flex; flex-direction: column; }
+
+  /* 1 Section = ซ้าย (Cues) + ขวา (Notes) */
+  .cornell-section {
+    display: grid; grid-template-columns: 240px 1fr;
+    border-bottom: 1px dashed var(--paper-line);
+    transition: background 0.3s; position: relative;
+  }
+  .cornell-section:hover { background: rgba(0,0,0,0.01); }
+  .dark-mode .cornell-section:hover { background: rgba(255,255,255,0.02); }
+
+  /* โซนซ้าย (Keywords & Cues) */
+  .cornell-cues-col {
+    border-right: 2px solid rgba(193, 88, 76, 0.5); /* เส้นสีแดงสไตล์ Cornell */
+    padding: 16px; background: rgba(255,255,255,0.3);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .dark-mode .cornell-cues-col { border-color: rgba(244, 114, 182, 0.4); background: rgba(0,0,0,0.15); }
+  
+  /* โซนขวา (เนื้อหาอธิบาย) */
+  .cornell-notes-col { 
+    padding: 16px 24px; outline: none; 
+    font-family: 'Inter', 'Sarabun', sans-serif; font-size: 16px; line-height: 1.8;
+  }
+
+  /* ปุ่มลบ Section ทิ้ง (โผล่ตอนเอาเมาส์ชี้) */
+  .sec-del-btn {
+    position: absolute; top: 16px; right: -36px;
+    width: 26px; height: 26px; border-radius: 6px; border: none;
+    background: #fbeee9; color: var(--coral); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: 0.2s; font-size: 12px;
+  }
+  .cornell-section:hover .sec-del-btn { opacity: 1; right: 12px; }
+  
+  /* โซนล่างสุด (Summary) */
+  .cornell-summary-zone {
+    border-top: 2px solid var(--paper-line);
+    padding: 20px 24px; background: #fdfbf7;
+    margin-top: auto; /* ดันตัวเองไปอยู่ล่างสุดของกระดาษเสมอ */
+  }
+  .dark-mode .cornell-summary-zone { background: #1a2235; border-color: var(--ink-700); }
+  
+  /* ดีไซน์การ์ด Keyword */
+  .cue-card {
+    background: #fff; border: 1px solid var(--paper-line);
+    padding: 8px 10px; border-radius: 6px; position: relative;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  }
+  .dark-mode .cue-card { background: var(--ink-900); border-color: var(--ink-700); }
+  .cue-card textarea {
+    width: 100%; border: none; outline: none; background: transparent;
+    font-family: 'Inter', 'Kanit', sans-serif; font-size: 14px;
+    resize: vertical; min-height: 24px; color: var(--ink-900); font-weight: 600;
+  }
+  .dark-mode .cue-card textarea { color: #fff; }
+  
+  .cue-del {
+    position: absolute; top: -6px; right: -6px;
+    width: 18px; height: 18px; background: var(--coral); color: #fff;
+    border: none; border-radius: 50%; font-size: 10px; cursor: pointer;
+    opacity: 0; transition: 0.2s;
+  }
+  .cue-card:hover .cue-del { opacity: 1; }
+
+  /* ปุ่มเสริมต่างๆ */
+  .cornell-add-btn {
+    padding: 8px; border: 1px dashed var(--paper-line); border-radius: 6px;
+    background: transparent; color: var(--text-soft); font-size: 12px;
+    cursor: pointer; transition: 0.2s; font-family: 'Prompt', sans-serif;
+  }
+  .cornell-add-btn:hover { border-color: var(--amber); color: var(--amber-deep); }
+  
+  .add-page-btn {
+    display: block; margin: 0 auto; padding: 12px 24px;
+    background: var(--ink-900); color: #fff; border: none; border-radius: 999px;
+    font-weight: 600; font-family: 'Prompt', sans-serif; font-size: 14px;
+    cursor: pointer; box-shadow: 0 4px 12px rgba(23, 35, 61, 0.2); transition: 0.2s;
+  }
+  .add-page-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(23, 35, 61, 0.3); }
+/* ปุ่มยุบ/ขยายกิ่ง (Collapse Button) บน Mind Map */
+  .mm-collapse-btn {
+    position: absolute; right: -12px; top: 50%; transform: translateY(-50%);
+    background: #fff; border: 2px solid var(--paper-line); border-radius: 50%;
+    width: 20px; height: 20px; font-size: 11px; font-weight: 800; font-family: 'Inter', sans-serif;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: var(--ink-700); box-shadow: 0 2px 6px rgba(0,0,0,0.1); z-index: 5;
+    transition: 0.2s;
+  }
+  .mm-collapse-btn:hover { border-color: var(--amber); color: var(--amber-deep); transform: translateY(-50%) scale(1.15); }
+  .dark-mode .mm-collapse-btn { background: var(--ink-800); border-color: var(--ink-600); color: #fff; }  
+/* =========================================================
+     ≡ PRO OUTLINE EDITOR (Drag & Drop, Rich Text, Tree Lines)
+  ========================================================= */
+  .outline-wrap { padding: 22px 32px; flex: 1; overflow-y: auto; }
+  .dark-mode .outline-wrap { background: var(--ink-900); }
+  
+  .ol-row {
+    display: flex; align-items: flex-start; gap: 6px; padding: 4px 0;
+    position: relative; transition: background 0.2s; border-radius: 6px;
+  }
+  .ol-row:hover { background: rgba(0,0,0,0.02); }
+  .dark-mode .ol-row:hover { background: rgba(255,255,255,0.03); }
+  
+  /* เส้นไกด์ไลน์ (Tree Lines) */
+  .ol-guide {
+    position: absolute; left: -14px; top: 24px; bottom: -4px;
+    border-left: 2px solid var(--paper-line); z-index: 1;
+  }
+
+  /* ปุ่มพับ/กาง (Collapse Arrow) */
+  .ol-collapse {
+    width: 20px; height: 26px; display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: var(--text-faint); cursor: pointer; flex-shrink: 0;
+    border-radius: 4px; z-index: 2; background: transparent; border: none;
+    transition: 0.2s;
+  }
+  .ol-collapse:hover { background: rgba(0,0,0,0.05); color: var(--ink-900); }
+  .ol-collapse.hidden { opacity: 0; pointer-events: none; }
+  .ol-collapse.is-collapsed { transform: rotate(-90deg); color: var(--amber-deep); }
+
+  /* ตัวจับลาก (Drag Handle) */
+  .ol-drag {
+    width: 16px; height: 26px; display: flex; align-items: center; justify-content: center;
+    color: var(--paper-line); cursor: grab; opacity: 0; font-size: 15px;
+    user-select: none; flex-shrink: 0; transition: 0.2s;
+  }
+  .ol-row:hover .ol-drag { opacity: 1; color: var(--text-faint); }
+  .ol-drag:active { cursor: grabbing; }
+
+  /* Bullet หรือ Checkbox */
+  .ol-bullet-btn {
+    width: 16px; height: 26px; display: flex; align-items: center; justify-content: center;
+    color: var(--amber-deep); font-size: 20px; cursor: pointer; flex-shrink: 0;
+    background: transparent; border: none; transition: 0.2s;
+  }
+  .ol-bullet-btn:hover { transform: scale(1.3); }
+  
+  .ol-checkbox {
+    width: 16px; height: 16px; border: 2px solid var(--text-soft); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;
+    margin-top: 5px; transition: 0.2s; color: transparent; font-size: 11px; font-weight: bold;
+  }
+  .ol-checkbox.checked { background: var(--sage); border-color: var(--sage); color: #fff; }
+
+  /* ช่องกรอกข้อความ (Rich Text) */
+  .ol-text {
+    flex: 1; border: none; outline: none; background: transparent;
+    font-size: 15px; padding: 2px 4px; color: var(--text); line-height: 1.6;
+    min-height: 26px; word-break: break-word;
+  }
+  .ol-text[data-checked="true"] { color: var(--text-faint); text-decoration: line-through; }
+  .ol-text:empty:before { content: attr(data-placeholder); color: var(--text-faint); pointer-events: none; }
+  
+  /* ปุ่มจัดการ (Indent, Outdent, Del) */
+  .ol-btns { display: flex; gap: 2px; opacity: 0; flex-shrink: 0; margin-top: 2px; transition: 0.2s; }
+  .ol-row:hover .ol-btns { opacity: 1; }
+  .ol-btns button { width: 24px; height: 24px; border-radius: 5px; border: none; background: var(--paper); color: var(--text-soft); font-size: 12px; cursor: pointer; transition: 0.2s; }
+  .ol-btns button:hover { background: var(--paper-line); color: var(--ink-900); }
+  .dark-mode .ol-btns button { background: transparent; }
+  .dark-mode .ol-btns button:hover { background: var(--ink-700); color: #fff; }
+  
+  /* สถานะตอนกำลังลาก (Dragging state) */
+  .ol-row.dragging { opacity: 0.4; background: var(--paper-line); }  
+/* =========================================================
+     🔒 AUTHENTICATION & LOGIN SCREEN
+  ========================================================= */
+  #authScreen {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    background-color: #fdfbf7; overflow: hidden;
+    font-family: 'Inter', 'Kanit', sans-serif;
+  }
+  
+  /* อนิเมชันพื้นหลังน่ารักๆ (Moving Blobs) */
+  .auth-bg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .blob {
+    position: absolute; filter: blur(60px); opacity: 0.6;
+    animation: floatBlob 12s infinite alternate ease-in-out;
+  }
+  .blob-1 { width: 400px; height: 400px; background: #d9a441; top: -100px; left: -100px; animation-delay: 0s; }
+  .blob-2 { width: 500px; height: 500px; background: #f472b6; bottom: -150px; right: -100px; animation-delay: -3s; }
+  .blob-3 { width: 300px; height: 300px; background: #6b8f71; bottom: 20%; left: 20%; animation-delay: -6s; }
+  
+  @keyframes floatBlob {
+    0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+    100% { transform: translate(50px, 50px) scale(1.1) rotate(20deg); }
+  }
+
+  /* กล่อง Login Card */
+  .auth-card {
+    background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 24px; padding: 40px; width: 400px; max-width: 90%;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.08); text-align: center;
+    position: relative; z-index: 10;
+    transform: translateY(20px); opacity: 0; animation: slideUpFade 0.6s var(--bounce) forwards;
+  }
+  .dark-mode #authScreen { background-color: var(--ink-900); }
+  .dark-mode .auth-card { background: rgba(15, 23, 42, 0.85); border-color: rgba(255,255,255,0.1); }
+  
+  .auth-logo { font-size: 32px; font-weight: 800; font-family: 'Fraunces', serif; color: var(--ink-900); margin-bottom: 8px; }
+  .auth-logo span { color: var(--amber); }
+  .dark-mode .auth-logo { color: #fff; }
+  
+  .auth-subtitle { font-size: 14px; color: var(--text-soft); margin-bottom: 24px; }
+  
+  /* ฟอร์ม Input */
+  .auth-form { display: flex; flex-direction: column; gap: 16px; text-align: left; }
+  .input-group { display: flex; flex-direction: column; gap: 6px; position: relative; }
+  .input-group label { font-size: 12px; font-weight: 600; color: var(--text-soft); }
+  .input-group input {
+    padding: 12px 16px; border-radius: 12px; border: 2px solid var(--paper-line);
+    background: #fff; font-size: 14.5px; outline: none; transition: 0.3s;
+  }
+  .input-group input:focus { border-color: var(--amber); box-shadow: 0 0 0 4px rgba(217, 164, 65, 0.1); }
+  
+  /* ดวงตาดูรหัสผ่าน */
+  .eye-btn {
+    position: absolute; right: 12px; top: 32px; background: none; border: none;
+    font-size: 16px; color: var(--text-faint); cursor: pointer; transition: 0.2s;
+  }
+  .eye-btn:hover { color: var(--ink-900); }
+  
+/* ปุ่มกด */
+  .auth-btn {
+    background: linear-gradient(135deg, #4f46e5, #818cf8) !important;
+    color: #ffffff !important; 
+    border: none !important; 
+    padding: 14px !important;
+    border-radius: 12px !important; 
+    font-size: 16px !important; 
+    font-weight: 700 !important; 
+    cursor: pointer !important;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important; 
+    box-shadow: 0 4px 15px rgba(79, 70, 229, 0.35) !important; 
+    margin-top: 8px !important;
+    width: 100%;
+  }
+  .auth-btn:hover { 
+    transform: translateY(-3px) scale(1.02) !important; 
+    box-shadow: 0 8px 25px rgba(79, 70, 229, 0.5) !important; 
+    filter: brightness(1.1);
+  }
+  
+  .auth-link { font-size: 13px; color: var(--text-soft); margin-top: 16px; cursor: pointer; }
+  .auth-link b { color: var(--amber-deep); transition: 0.2s; }
+  .auth-link b:hover { text-decoration: underline; }
+
+  /* ข้อความแจ้งเตือน (Validation) */
+  .auth-msg { font-size: 12.5px; font-weight: 600; padding: 10px; border-radius: 8px; margin-bottom: 16px; display: none; }
+  .auth-msg.error { background: #fbeee9; color: var(--coral); display: block; border-left: 4px solid var(--coral); }
+  .auth-msg.success { background: #eef5ef; color: var(--sage-deep); display: block; border-left: 4px solid var(--sage-deep); }
+
+  /* =========================================================
+     👤 SAVED PROFILES (บัญชีที่เคยล็อกอิน)
+  ========================================================= */
+  .profiles-wrap { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
+  .profile-card {
+    position: relative; cursor: pointer; transition: 0.3s var(--bounce);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .profile-card:hover { transform: translateY(-4px); }
+  
+  .profile-avatar {
+    width: 80px; height: 80px; border-radius: 50%; border: 3px solid #fff;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.1); background: #fdfbf7; overflow: hidden;
+  }
+  .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .profile-name { font-size: 14px; font-weight: 600; color: var(--ink-900); }
+  
+  .profile-remove {
+    position: absolute; top: -4px; right: -4px; width: 24px; height: 24px;
+    background: var(--coral); color: #fff; border: none; border-radius: 50%;
+    font-size: 12px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0; transition: 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  }
+  .profile-card:hover .profile-remove { opacity: 1; }  
+/* เอฟเฟกต์ตอนเอาเมาส์ชี้ที่รูปโปรไฟล์ใน Sidebar */
+  .sidebar-avatar-wrap { position: relative; cursor: pointer; display: block; }
+  .sidebar-avatar-wrap::after {
+    content: '✎ แต่งรูป'; position: absolute; inset: 0; background: rgba(0,0,0,0.6);
+    color: white; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: bold; opacity: 0; transition: 0.2s; border-radius: 50%;
+  }
+  .sidebar-avatar-wrap:hover::after { opacity: 1; }
+</style>
+</head>
+<body>
+<!-- 🔒 ระบบ Authentication Screen -->
+<div id="authScreen">
+  <div class="auth-bg">
+    <div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div>
+  </div>
+  
+  <div class="auth-card">
+    <div class="auth-logo">✨SARUP<span>SI</span></div>
+    <div class="auth-subtitle" id="authSubtitle">ยินดีต้อนรับกลับมา!</div>
+    
+    <div id="authMsg" class="auth-msg"></div>
+
+    <!-- 1. หน้าเลือกโปรไฟล์ (Saved Accounts) -->
+    <div id="viewProfiles" style="display: none;">
+      <div style="font-size:15px; font-weight:600; margin-bottom:16px; color:var(--ink-900);">เลือกบัญชีของคุณ</div>
+      <div class="profiles-wrap" id="profilesList"></div>
+      <div class="auth-link" onclick="switchAuthView('login')"><b>เข้าสู่ระบบด้วยบัญชีอื่น</b></div>
+    </div>
+
+    <!-- 2. หน้า Login -->
+    <div id="viewLogin" style="display: none;">
+      <div class="auth-form">
+        <div class="input-group">
+          <label>รหัสประจำตัว (ID)</label>
+          <input type="text" id="loginId" placeholder="เช่น 640610xxx" autocomplete="off">
+        </div>
+        <div class="input-group">
+          <label>รหัสผ่าน</label>
+          <input type="password" id="loginPwd" placeholder="กรอกรหัสผ่าน">
+          <button class="eye-btn" onclick="togglePwd('loginPwd', this)">👁️</button>
+        </div>
+        <button class="auth-btn" onclick="doLogin()">เข้าสู่ระบบ</button>
+      </div>
+      <div class="auth-link" onclick="switchAuthView('register')">ยังไม่ได้ลงทะเบียนใช่ไหม? <b>สร้างบัญชีใหม่</b></div>
+    </div>
+
+    <!-- 3. หน้าลงทะเบียน (Register) -->
+    <div id="viewRegister" style="display: none;">
+      <div class="auth-form">
+        <div class="input-group">
+          <label>ชื่อ - นามสกุล (หรือชื่อเล่น)</label>
+          <input type="text" id="regName" placeholder="เช่น น้อนสรุปสิ">
+        </div>
+        <div class="input-group">
+          <label>รหัสประจำตัว (ID)</label>
+          <input type="text" id="regId" placeholder="ใช้สำหรับเข้าสู่ระบบ">
+        </div>
+        <div class="input-group">
+          <label>รหัสผ่าน</label>
+          <input type="password" id="regPwd" placeholder="ตั้งรหัสผ่าน">
+          <button class="eye-btn" onclick="togglePwd('regPwd', this)">👁️</button>
+        </div>
+        <div class="input-group">
+          <label>ยืนยันรหัสผ่าน</label>
+          <input type="password" id="regPwdConfirm" placeholder="กรอกรหัสผ่านอีกครั้ง">
+          <button class="eye-btn" onclick="togglePwd('regPwdConfirm', this)">👁️</button>
+        </div>
+        <button class="auth-btn" onclick="doRegister()">ลงทะเบียน</button>
+      </div>
+      <div class="auth-link" onclick="switchAuthView('login')">มีบัญชีอยู่แล้ว? <b>เข้าสู่ระบบ</b></div>
+    </div>
+
+  </div>
+</div>  
+<div id="app">
+
+  <aside class="spine" id="spine">
+<div class="brand" style="cursor:pointer;" onclick="sel.yearId=null; sel.subjectId=null; sel.unitId=null; renderAll();" title="กลับหน้าหลัก">
+      <div class="mark"><span style="font-size:22px; margin-right:4px;">✨</span>SARUP<span>SI</span></div>
+      <div class="by">by SUKI</div>
+    </div>
+    <div class="years" id="yearsList"></div>
+<div class="spine-foot">
+      <!-- รูปโปรไฟล์และชื่อในแอป -->
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; padding:0 4px;">
+<div class="sidebar-avatar-wrap" style="width:34px; height:34px; border-radius:50%; background:#fff; overflow:hidden; flex-shrink:0;" onclick="openAvatarStudio()" title="คลิกเพื่อแต่งรูปโปรไฟล์">
+  <img id="appUserAvatar" src="" style="width:100%; height:100%; object-fit:cover;">
+</div>
+        <div style="flex:1;">
+          <div style="font-size:12px; font-weight:600; color:#fff;" id="appUserName">Loading...</div>
+          <div style="font-size:10px; color:#8290ad;" id="appUserId">ID: ...</div>
+        </div>
+      </div>
+
+      <button class="ghost-btn" id="exportBtn">⬇ Export backup (.json)</button>
+      <label class="ghost-btn" style="justify-content:center;">
+        ⬆ Import backup
+        <input type="file" id="importInput" accept="application/json" style="display:none;">
+      </label>
+      <button class="ghost-btn" onclick="doLogout()" style="color:var(--coral); justify-content:center; margin-top:4px;">
+        🚪 ลงชื่อออก (Logout)
+      </button>
+    </div>
+  </aside>
+
+ <div class="binder">
+    <div class="topbar">
+      <button class="topbtn" id="menuToggle" style="display:none;">☰</button>
+      <div class="crumbtitle">
+        <div class="eyebrow" id="crumbEyebrow">SARUPSI</div>
+        <h1 id="crumbTitle">Welcome</h1>
+      </div>
+      <button class="topbtn" id="pomoBtn" title="Pomodoro Focus Mode" style="font-family:'JetBrains Mono',monospace;">🍅 25:00</button>
+      <button class="topbtn" id="themeBtn" title="Toggle Dark Mode">🌙</button>
+      <div class="search-wrap">
+        <span class="sico">⌕</span>
+        <input type="text" id="searchInput" placeholder="Search notes or #tags…">
+        <div class="search-results" id="searchResults" style="display:none;"></div>
+      </div>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+
+</div>
+
+<div id="modalRoot"></div>
+<div class="toast" id="toast"></div>
+
+<!-- 📦 1. นำเข้าไลบรารีของ Firebase (ใช้เวอร์ชัน Compat เพื่อไม่ให้กระทบโค้ดแอปเดิม) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<script>
+/* ================= FIREBASE SETUP ================= */
+// 🔑 2. วางกุญแจ Config ที่ได้มา
+const firebaseConfig = {
+  apiKey: "AIzaSyAIi_MoPjO_TE9CJCbQ_6bVDdh-crpIHrM",
+  authDomain: "sukisarupsi.firebaseapp.com",
+  databaseURL: "https://sukisarupsi-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "sukisarupsi",
+  storageBucket: "sukisarupsi.firebasestorage.app",
+  messagingSenderId: "814402516659",
+  appId: "1:814402516659:web:8a6cb309a214e9964fe2c6",
+  measurementId: "G-RFGLF8EQB3"
+};
+
+// 🚀 3. สั่งปลุก Firebase ให้เริ่มทำงาน
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+
+/* ================= STATE ================= */
+let data = { years: [] };
+let sel = { yearId: null, subjectId: null, unitId: null, type: 'note' };
+let mmState = null; // active mind-map drag state
+
+const TYPES = [
+  {key:'note', label:'Note', icon:'📝', color:'#e7dbc2', text:'#7a5b17'},
+  {key:'cornell', label:'Cornell', icon:'📑', color:'#d4e4ed', text:'#2c5282'},
+  {key:'mindmap', label:'Mind Map', icon:'🕸️', color:'#dbe7dd', text:'#3d5f43'},
+  {key:'flashcard', label:'Flashcards', icon:'🗂️', color:'#e3dcf0', text:'#5a4693'},
+  {key:'outline', label:'Outline', icon:'≡', color:'#f0dcdc', text:'#8a3d3d'},
+];
+const SUBJECT_COLORS = ['#d9a441','#6b8f71','#c1584c','#5a7fb8','#a3699e','#4f9d9d'];
+const NODE_COLORS = ['#f6d977','#a8d8b0','#f2b6ab','#a9c7ef','#d3b3ea'];
+
+function uid(){ return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function now(){ return Date.now(); }
+function fmtDate(ts){
+  const d = new Date(ts);
+  return d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' · ' + d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+}
+function stripHtml(html){ const t=document.createElement('div'); t.innerHTML=html; return t.textContent||''; }
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>el.classList.remove('show'),1800);
+}
+
+/* ================= LOOKUPS ================= */
+function getYear(id){ return data.years.find(y=>y.id===id); }
+function getSubject(yid,sid){ const y=getYear(yid); return y && y.subjects.find(s=>s.id===sid); }
+function getUnit(yid,sid,uid_){ const s=getSubject(yid,sid); return s && s.units.find(u=>u.id===uid_); }
+function currentUnit(){ return sel.unitId ? getUnit(sel.yearId, sel.subjectId, sel.unitId) : null; }
+
+/* ================= SEED (first-time demo) ================= */
+function seed(){
+  const y = {id:uid(), name:'Year 2 · Semester 1', open:true, subjects:[]};
+  const s = {id:uid(), name:'Data Structures & Algorithms', color:SUBJECT_COLORS[3], open:true, units:[]};
+  const u = {id:uid(), name:'Unit 1 — Trees & Graphs', summaries:[]};
+  u.summaries.push({id:uid(), type:'note', title:'Binary Search Trees', content:'<h2>Binary Search Trees</h2><p>A BST keeps every left child smaller and every right child larger than its parent, so an <b>in-order traversal</b> yields sorted output.</p><ul><li>Insert / Search: O(h)</li><li>Balanced height h ≈ log n</li></ul><blockquote>Unbalanced insertion order can degrade a BST into a linked list.</blockquote>', updatedAt: now()});
+  u.summaries.push({id:uid(), type:'mindmap', title:'Graph Traversal Overview', content:{nodes:[
+      {id:'r', text:'Graph Traversal', x:850, y:80, color:0, parentId:null, root:true},
+      {id:'a', text:'BFS', x:560, y:260, color:1, parentId:'r'},
+      {id:'b', text:'DFS', x:1140, y:260, color:2, parentId:'r'},
+      {id:'a1', text:'Uses a Queue', x:420, y:420, color:1, parentId:'a'},
+      {id:'a2', text:'Finds shortest path (unweighted)', x:700, y:420, color:1, parentId:'a'},
+      {id:'b1', text:'Uses a Stack / recursion', x:1000, y:420, color:2, parentId:'b'},
+      {id:'b2', text:'Good for cycle detection', x:1280, y:420, color:2, parentId:'b'},
+  ]}, updatedAt: now()});
+  s.units.push(u);
+  y.subjects.push(s);
+  data.years.push(y);
+  sel.yearId=y.id; sel.subjectId=s.id; sel.unitId=u.id;
+}
+seed();
+
+/* ================= MODAL ================= */
+function openModal({title, msg, fields=[], danger=false, submitLabel='Save', onSubmit}){
+  const root = document.getElementById('modalRoot');
+  const values = {};
+  fields.forEach(f=>values[f.name]=f.value||'');
+  root.innerHTML = `<div class="modal-overlay" id="ovl">
+    <div class="modal-box">
+      <h3>${title}</h3>
+      ${msg?`<p class="msg">${msg}</p>`:''}
+      <div id="fieldsWrap"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="mCancel">Cancel</button>
+        <button class="${danger?'btn-danger':'btn-primary'}" id="mSubmit">${submitLabel}</button>
+      </div>
+    </div>
+  </div>`;
+  const wrap = document.getElementById('fieldsWrap');
+  fields.forEach(f=>{
+    const div = document.createElement('div');
+    div.className='modal-field';
+    if(f.type==='color'){
+      div.innerHTML = `<label>${f.label}</label><div class="swatch-row" data-name="${f.name}"></div>`;
+      wrap.appendChild(div);
+      const row = div.querySelector('.swatch-row');
+      SUBJECT_COLORS.forEach(c=>{
+        const sw=document.createElement('div');
+        sw.className='sw'+(c===f.value?' on':'');
+        sw.style.background=c;
+        sw.onclick=()=>{ values[f.name]=c; row.querySelectorAll('.sw').forEach(s=>s.classList.remove('on')); sw.classList.add('on');};
+        row.appendChild(sw);
+      });
+      if(!values[f.name]) values[f.name]=SUBJECT_COLORS[0];
+    } else {
+      div.innerHTML = `<label>${f.label}</label><input type="text" data-name="${f.name}" value="${(f.value||'').replace(/"/g,'&quot;')}" placeholder="${f.placeholder||''}">`;
+      wrap.appendChild(div);
+      const inp = div.querySelector('input');
+      inp.oninput = ()=> values[f.name]=inp.value;
+      setTimeout(()=>{inp.focus(); inp.select();},30);
+    }
+  });
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('ovl').addEventListener('click',e=>{ if(e.target.id==='ovl') closeModal(); });
+  document.getElementById('mSubmit').onclick = ()=>{ onSubmit(values); closeModal(); };
+  root.querySelectorAll('input[type=text]').forEach(inp=>{
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ onSubmit(values); closeModal(); }});
+  });
+}
+function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
+
+/* ================= SIDEBAR ================= */
+function renderSidebar(){
+  const wrap = document.getElementById('yearsList');
+  wrap.innerHTML = '';
+  data.years.forEach(y=>{
+    const yEl = document.createElement('div');
+    yEl.className = 'year-tab' + (y.open?' open':'') + (y.id===sel.yearId?' active':'');
+    yEl.innerHTML = `
+      <div class="year-tab-head">
+        <span class="chev">▶</span>
+        <span class="name">${escapeHtml(y.name)}</span>
+        <button class="icon-btn" data-act="renameYear" title="เปลี่ยนชื่อ">✎</button>
+        <button class="icon-btn" data-act="delYear" title="ลบเทอม">✕</button>
+      </div>
+      <div class="subjects"></div>`;
+    yEl.querySelector('.year-tab-head').addEventListener('click', e=>{
+      if(e.target.closest('[data-act]')) return;
+      y.open = !y.open; sel.yearId = y.id; sel.subjectId = null; sel.unitId = null; renderAll();
+    });
+    yEl.querySelector('[data-act="renameYear"]').onclick = e=>{ e.stopPropagation();
+      openModal({title:'เปลี่ยนชื่อเทอม', fields:[{name:'name',label:'ชื่อเทอม',value:y.name}], submitLabel:'บันทึก',
+        onSubmit:v=>{ if(v.name.trim()){ y.name=v.name.trim(); renderAll(); toast('บันทึกสำเร็จ'); } else {toast('ชื่อต้องไม่ว่างเปล่า!');}}});
+    };
+    yEl.querySelector('[data-act="delYear"]').onclick = e=>{ e.stopPropagation();
+      openModal({title:'ลบเทอมนี้ทิ้ง?', msg:`"${y.name}" และทุกอย่างข้างในจะหายไปถาวร`, danger:true, submitLabel:'ลบทิ้ง',
+        onSubmit:()=>{ data.years = data.years.filter(x=>x.id!==y.id);
+          if(sel.yearId===y.id){ sel.yearId=null; sel.subjectId=null; sel.unitId=null; } renderAll(); toast('ลบสำเร็จ'); }});
+    };
+
+    const subjWrap = yEl.querySelector('.subjects');
+    y.subjects.forEach(s=>{
+      const sEl = document.createElement('div');
+      sEl.className = 'subject-item' + (s.open?' open':'') + (s.id===sel.subjectId?' active':'');
+      sEl.innerHTML = `
+        <div class="subject-head">
+          <span class="chev">▶</span>
+          <span class="subject-dot" style="background:${s.color}"></span>
+          <span class="name">${escapeHtml(s.name)}</span>
+          <button class="icon-btn" data-act="renameSub" title="เปลี่ยนชื่อ">✎</button>
+          <button class="icon-btn" data-act="delSub" title="ลบวิชา">✕</button>
+        </div>
+        <div class="units"></div>`;
+      sEl.querySelector('.subject-head').addEventListener('click', e=>{
+        if(e.target.closest('[data-act]')) return;
+        s.open = !s.open; sel.yearId=y.id; sel.subjectId=s.id; sel.unitId = null; renderAll();
+      });
+      sEl.querySelector('[data-act="renameSub"]').onclick = e=>{ e.stopPropagation();
+        openModal({title:'แก้ไขวิชา', fields:[{name:'name',label:'ชื่อวิชา',value:s.name},{name:'color',label:'สี',type:'color',value:s.color}], submitLabel:'บันทึก',
+          onSubmit:v=>{ if(v.name.trim()){ s.name=v.name.trim(); s.color=v.color; renderAll(); toast('บันทึกสำเร็จ'); } else {toast('ชื่อต้องไม่ว่างเปล่า!');}}});
+      };
+      sEl.querySelector('[data-act="delSub"]').onclick = e=>{ e.stopPropagation();
+        openModal({title:'ลบวิชานี้ทิ้ง?', msg:`"${s.name}" และบทเรียนทั้งหมดจะหายไป`, danger:true, submitLabel:'ลบทิ้ง',
+          onSubmit:()=>{ y.subjects = y.subjects.filter(x=>x.id!==s.id);
+            if(sel.subjectId===s.id){ sel.subjectId=null; sel.unitId=null; } renderAll(); toast('ลบสำเร็จ'); }});
+      };
+
+      const unitWrap = sEl.querySelector('.units');
+      s.units.forEach(u=>{
+        const uEl = document.createElement('div');
+        uEl.className = 'unit-item' + (u.id===sel.unitId?' active':'');
+        uEl.innerHTML = `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(u.name)}</span>
+          <button class="icon-btn" data-act="renameUnit" title="เปลี่ยนชื่อ">✎</button>
+          <button class="icon-btn" data-act="delUnit" title="ลบบทเรียน">✕</button>`;
+uEl.addEventListener('click', e=>{
+          if(e.target.closest('[data-act]')) return;
+          sel.yearId=y.id; sel.subjectId=s.id; sel.unitId=u.id; sel.type='note'; 
+          u._openItem = null; // <-- เคลียร์หน้ากระดาษ ให้โชว์ Grid ก่อน
+          renderAll();
+        });
+        uEl.querySelector('[data-act="renameUnit"]').onclick = e=>{ e.stopPropagation();
+          openModal({title:'เปลี่ยนชื่อบทเรียน', fields:[{name:'name',label:'ชื่อ',value:u.name}], submitLabel:'บันทึก',
+            onSubmit:v=>{ if(v.name.trim()){ u.name=v.name.trim(); renderAll(); toast('บันทึกสำเร็จ'); } else {toast('ชื่อต้องไม่ว่างเปล่า!');}}});
+        };
+        uEl.querySelector('[data-act="delUnit"]').onclick = e=>{ e.stopPropagation();
+          openModal({title:'ลบบทเรียนนี้ทิ้ง?', msg:`"${u.name}" และสรุปข้างในจะถูกลบทั้งหมด`, danger:true, submitLabel:'ลบทิ้ง',
+            onSubmit:()=>{ s.units = s.units.filter(x=>x.id!==u.id);
+              if(sel.unitId===u.id) sel.unitId=null; renderAll(); toast('ลบสำเร็จ'); }});
+        };
+        unitWrap.appendChild(uEl);
+      });
+      const addUnitBtn = document.createElement('button');
+      addUnitBtn.className='add-row'; addUnitBtn.innerHTML='+ สร้างบทเรียนใหม่';
+      addUnitBtn.onclick = e=>{ e.stopPropagation();
+        openModal({title:'สร้างบทเรียนใหม่', fields:[{name:'name',label:'ชื่อบทเรียน',placeholder:'เช่น บทที่ 1 - บทนำ'}], submitLabel:'สร้าง',
+          onSubmit:v=>{ if(v.name.trim()){ const nu={id:uid(),name:v.name.trim(),summaries:[]}; s.units.push(nu);
+            sel.yearId=y.id; sel.subjectId=s.id; sel.unitId=nu.id; s.open=true; y.open=true; renderAll(); toast('สร้างสำเร็จ'); } else {toast('โปรดใส่ชื่อด้วยครับ');}}});
+      };
+      unitWrap.appendChild(addUnitBtn);
+      subjWrap.appendChild(sEl);
+    });
+    const addSubBtn = document.createElement('button');
+    addSubBtn.className='add-row'; addSubBtn.innerHTML='+ สร้างวิชาใหม่';
+    addSubBtn.onclick = e=>{ e.stopPropagation();
+      openModal({title:'สร้างวิชาใหม่', fields:[{name:'name',label:'ชื่อวิชา',placeholder:'เช่น Organic Chemistry'},{name:'color',label:'สีประจำวิชา',type:'color',value:SUBJECT_COLORS[y.subjects.length%SUBJECT_COLORS.length]}], submitLabel:'สร้าง',
+        onSubmit:v=>{ if(v.name.trim()){ const ns={id:uid(),name:v.name.trim(),color:v.color,open:true,units:[]}; y.subjects.push(ns);
+          sel.yearId=y.id; sel.subjectId=ns.id; sel.unitId=null; y.open=true; renderAll(); toast('สร้างสำเร็จ'); } else {toast('โปรดใส่ชื่อด้วยครับ');}}});
+    };
+    subjWrap.appendChild(addSubBtn);
+    wrap.appendChild(yEl);
+  });
+
+  const addYearBtn = document.createElement('button');
+  addYearBtn.className='add-row'; addYearBtn.style.marginTop='6px';
+  addYearBtn.innerHTML='+ สร้างเทอม/ปีการศึกษาใหม่';
+  addYearBtn.onclick = ()=>{
+    openModal({title:'สร้างเทอมใหม่', fields:[{name:'name',label:'ชื่อเทอม',placeholder:'เช่น ปี 2 เทอม 1'}], submitLabel:'สร้าง',
+      onSubmit:v=>{ if(v.name.trim()){ const ny={id:uid(),name:v.name.trim(),open:true,subjects:[]}; data.years.push(ny);
+        sel.yearId=ny.id; sel.subjectId=null; sel.unitId=null; renderAll(); toast('สร้างสำเร็จ'); } else {toast('โปรดใส่ชื่อด้วยครับ');}}});
+  };
+  wrap.appendChild(addYearBtn);
+}
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ================= CONTENT AREA ================= */
+function renderContent(){
+  const c = document.getElementById('content');
+  const eyebrow = document.getElementById('crumbEyebrow');
+  const title = document.getElementById('crumbTitle');
+  const unit = currentUnit();
+  const subj = sel.subjectId ? getSubject(sel.yearId, sel.subjectId) : null;
+  const year = sel.yearId ? getYear(sel.yearId) : null;
+
+if(!unit){
+    let html = `<div class="folder-grid">`;
+
+    // ระดับ 0: หน้าโฮม (แสดงเทอมทั้งหมด)
+    if (!year) {
+      eyebrow.textContent = 'SARUPSI Dashboard'; title.innerHTML = '📂 หน้าหลัก (แฟ้มทั้งหมด)';
+      html += `<div class="folder-card" id="addYearCard"><div class="folder-icon folder-add">+</div><div class="folder-name" style="color:var(--text-soft);">+ สร้างเทอมใหม่</div></div>`;
+      data.years.forEach(y => {
+        html += `
+          <div class="folder-card" data-nav-year="${y.id}">
+            <div class="folder-icon" style="background:var(--ink-700);">
+              <div class="folder-actions">
+                <button class="folder-btn" title="เปลี่ยนชื่อ" data-edit-y="${y.id}">✎</button>
+                <button class="folder-btn del-btn" title="ลบ" data-del-y="${y.id}">✕</button>
+              </div>
+            </div>
+            <div class="folder-name">${escapeHtml(y.name)}</div><div class="folder-meta">${y.subjects.length} วิชา</div>
+          </div>`;
+      });
+    } 
+    // ระดับ 1: เจาะเข้าเทอม (แสดงวิชา)
+    else if (!subj) {
+      eyebrow.textContent = 'SARUPSI  ›  ' + year.name; title.innerHTML = `<button onclick="sel.yearId=null; renderAll();" class="topbtn" style="padding:4px 10px; margin-right:12px; border-radius:8px;">← กลับ</button> 📂 วิชาทั้งหมดใน ${escapeHtml(year.name)}`;
+      html += `<div class="folder-card" id="addSubjCard"><div class="folder-icon folder-add">+</div><div class="folder-name" style="color:var(--text-soft);">+ สร้างวิชาใหม่</div></div>`;
+      year.subjects.forEach(s => {
+        html += `
+          <div class="folder-card" data-nav-subj="${s.id}">
+            <div class="folder-icon" style="background:${s.color};">
+              <div class="folder-actions">
+                <button class="folder-btn" title="เปลี่ยนชื่อ" data-edit-s="${s.id}">✎</button>
+                <button class="folder-btn del-btn" title="ลบ" data-del-s="${s.id}">✕</button>
+              </div>
+            </div>
+            <div class="folder-name">${escapeHtml(s.name)}</div><div class="folder-meta">${s.units.length} บทเรียน</div>
+          </div>`;
+      });
+    } 
+    // ระดับ 2: เจาะเข้าวิชา (แสดงบทเรียน)
+    else {
+      eyebrow.textContent = `${year.name}  ›  ${subj.name}`; title.innerHTML = `<button onclick="sel.subjectId=null; renderAll();" class="topbtn" style="padding:4px 10px; margin-right:12px; border-radius:8px;">← กลับ</button> 📂 บทเรียนใน ${escapeHtml(subj.name)}`;
+      html += `<div class="folder-card" id="addUnitCard"><div class="folder-icon folder-add">+</div><div class="folder-name" style="color:var(--text-soft);">+ สร้างบทเรียน</div></div>`;
+      subj.units.forEach(u => {
+        html += `
+          <div class="folder-card" data-nav-unit="${u.id}">
+            <div class="folder-icon" style="background:${subj.color}; filter:brightness(1.15);">
+              <div class="folder-actions">
+                <button class="folder-btn" title="เปลี่ยนชื่อ" data-edit-u="${u.id}">✎</button>
+                <button class="folder-btn del-btn" title="ลบ" data-del-u="${u.id}">✕</button>
+              </div>
+            </div>
+            <div class="folder-name">${escapeHtml(u.name)}</div><div class="folder-meta">${u.summaries.length} สรุป</div>
+          </div>`;
+      });
+    }
+
+    html += `</div>`; c.innerHTML = html;
+
+  // --- ผูกฟังก์ชัน (Event Bindings) ให้กดได้แบบลื่นๆ ---
+    if(document.getElementById('addYearCard')) document.getElementById('addYearCard').onclick = () => openModal({title:'สร้างเทอมใหม่', fields:[{name:'name',label:'ชื่อเทอม',placeholder:'เช่น ปี 2 เทอม 1'}], submitLabel:'สร้าง', onSubmit:v=>{ if(v.name.trim()){ data.years.push({id:uid(),name:v.name.trim(),open:true,subjects:[]}); sel.yearId=data.years[data.years.length-1].id; sel.subjectId=null; sel.unitId=null; renderAll(); toast('สร้างสำเร็จ!');} else {toast('กรุณาตั้งชื่อด้วยครับ');}}});
+    if(document.getElementById('addSubjCard')) document.getElementById('addSubjCard').onclick = () => openModal({title:'สร้างวิชาใหม่', fields:[{name:'name',label:'ชื่อวิชา',placeholder:'เช่น Organic Chemistry'},{name:'color',label:'สีประจำวิชา',type:'color',value:SUBJECT_COLORS[year.subjects.length%SUBJECT_COLORS.length]}], submitLabel:'สร้าง', onSubmit:v=>{ if(v.name.trim()){ year.subjects.push({id:uid(),name:v.name.trim(),color:v.color,open:true,units:[]}); sel.yearId=year.id; sel.subjectId=year.subjects[year.subjects.length-1].id; sel.unitId=null; year.open=true; renderAll(); toast('สร้างสำเร็จ!');} else {toast('กรุณาตั้งชื่อด้วยครับ');}}});
+    if(document.getElementById('addUnitCard')) document.getElementById('addUnitCard').onclick = () => openModal({title:'สร้างบทเรียนใหม่', fields:[{name:'name',label:'ชื่อบทเรียน',placeholder:'เช่น บทที่ 1 - บทนำ'}], submitLabel:'สร้าง', onSubmit:v=>{ if(v.name.trim()){ subj.units.push({id:uid(),name:v.name.trim(),summaries:[]}); sel.yearId=year.id; sel.subjectId=subj.id; sel.unitId=subj.units[subj.units.length-1].id; subj.open=true; year.open=true; renderAll(); toast('สร้างสำเร็จ!');} else {toast('กรุณาตั้งชื่อด้วยครับ');}}});
+
+    c.querySelectorAll('[data-nav-year]').forEach(el => el.onclick = (e) => { if(e.target.closest('.folder-btn')) return; sel.yearId=el.dataset.navYear; sel.subjectId=null; sel.unitId=null; renderAll(); });
+    c.querySelectorAll('[data-nav-subj]').forEach(el => el.onclick = (e) => { if(e.target.closest('.folder-btn')) return; sel.subjectId=el.dataset.navSubj; sel.unitId=null; renderAll(); });
+    c.querySelectorAll('[data-nav-unit]').forEach(el => el.onclick = (e) => { if(e.target.closest('.folder-btn')) return; sel.unitId=el.dataset.navUnit; sel.type='note'; renderAll(); });
+
+    c.querySelectorAll('[data-edit-y]').forEach(btn => btn.onclick = (e) => { e.stopPropagation(); const y=getYear(btn.dataset.editY); openModal({title:'เปลี่ยนชื่อเทอม', fields:[{name:'name',label:'ชื่อ',value:y.name}], submitLabel:'บันทึก', onSubmit:v=>{ if(v.name.trim()){ y.name=v.name.trim(); renderAll(); toast('บันทึกแล้ว'); } else {toast('ชื่อต้องไม่ว่างเปล่า!');}}}); });
+    c.querySelectorAll('[data-del-y]').forEach(btn => btn.onclick = (e) => { e.stopPropagation(); const y=getYear(btn.dataset.delY); openModal({title:'ลบเทอมนี้?', msg:`"${y.name}" และทุกอย่างข้างในจะหายไปถาวร`, danger:true, submitLabel:'ลบทิ้ง', onSubmit:()=>{ data.years=data.years.filter(x=>x.id!==y.id); if(sel.yearId===y.id){sel.yearId=null;sel.subjectId=null;sel.unitId=null;} renderAll(); toast('ลบสำเร็จ'); }}); });
+
+    c.querySelectorAll('[data-edit-s]').forEach(btn => btn.onclick = (e) => { e.stopPropagation(); const s=getSubject(sel.yearId, btn.dataset.editS); openModal({title:'แก้ไขวิชา', fields:[{name:'name',label:'ชื่อ',value:s.name},{name:'color',label:'สี',type:'color',value:s.color}], submitLabel:'บันทึก', onSubmit:v=>{ if(v.name.trim()){ s.name=v.name.trim(); s.color=v.color; renderAll(); toast('บันทึกแล้ว'); } else {toast('ชื่อต้องไม่ว่างเปล่า!');}}}); });
+    c.querySelectorAll('[data-del-s]').forEach(btn => btn.onclick = (e) => { e.stopPropagation(); const s=getSubject(sel.yearId, btn.dataset.delS); openModal({title:'ลบวิชานี้?', msg:`"${s.name}" และบทเรียนทั้งหมดจะหายไปถาวร`, danger:true, submitLabel:'ลบทิ้ง', onSubmit:()=>{ year.subjects=year.subjects.filter(x=>x.id!==s.id); if(sel.subjectId===s.id){sel.subjectId=null;sel.unitId=null;} renderAll(); toast('ลบสำเร็จ'); }}); });
+
+    c.querySelectorAll('[data-edit-u]').forEach(btn => btn.onclick = (e) => { e.stopPropagation(); const u=getUnit(sel.yearId, sel.subjectId, btn.dataset.editU); openModal({title:'เปลี่ยนชื่อบทเรียน', fields:[{name:'name',label:'ชื่อ',value:u.name}], submitLabel:'บันทึก', onSubmit:v=>{ if(v.name.trim()){ u.name=v.name.trim(); renderAll(); toast('บันทึกแล้ว'); } else {toast('ชื่อต้องไม่ว่างเปล่า!');}}}); });
+    c.querySelectorAll('[data-del-u]').forEach(btn => btn.onclick = (e) => { e.stopPropagation(); const u=getUnit(sel.yearId, sel.subjectId, btn.dataset.delU); openModal({title:'ลบบทเรียนนี้?', msg:`"${u.name}" และเนื้อหาสรุปทั้งหมดจะหายไปถาวร`, danger:true, submitLabel:'ลบทิ้ง', onSubmit:()=>{ subj.units=subj.units.filter(x=>x.id!==u.id); if(sel.unitId===u.id) sel.unitId=null; renderAll(); toast('ลบสำเร็จ'); }}); });
+
+    return;
+  }
+
+  eyebrow.textContent = `${year.name}  ·  ${subj.name}`;
+  title.textContent = unit.name;
+
+  const typeTabs = TYPES.map(t=>{
+    const count = unit.summaries.filter(s=>s.type===t.key).length;
+    return `<button class="type-tab ${sel.type===t.key?'active':''}" data-type="${t.key}">
+      <span class="tico">${t.icon}</span> ${t.label} ${count?`<span style="opacity:.55">· ${count}</span>`:''}
+    </button>`;
+  }).join('');
+
+  c.innerHTML = `<div class="type-tabs">${typeTabs}</div><div id="typePanel"></div>`;
+c.querySelectorAll('.type-tab').forEach(btn=>{
+    btn.onclick = ()=>{ 
+      sel.type = btn.dataset.type; 
+      unit._openItem = null; // <-- รีเซ็ตให้กลับมาหน้า Grid เสมอเมื่อสลับ Tab
+      renderContent(); 
+    };
+  });
+
+  renderTypePanel(unit);
+}
+
+function renderTypePanel(unit){
+  const panel = document.getElementById('typePanel');
+  const meta = TYPES.find(t=>t.key===sel.type);
+  const items = unit.summaries.filter(s=>s.type===sel.type);
+
+  panel.innerHTML = `
+    <div class="panel-toolbar">
+      <div class="eyebrow">${items.length} ${meta.label.toLowerCase()}${items.length===1?'':'s'}</div>
+      <button class="newbtn" id="newItemBtn">+ New ${meta.label}</button>
+    </div>
+    <div id="listWrap"></div>`;
+
+  document.getElementById('newItemBtn').onclick = ()=> createSummary(unit, sel.type);
+
+ const listWrap = document.getElementById('listWrap');
+  if(items.length===0){
+    listWrap.innerHTML = `<div class="empty-state" style="min-height:260px;">
+      <div class="big">${meta.icon}</div>
+      <h2>ยังไม่มีไฟล์ ${meta.label} ในบทเรียนนี้</h2>
+      <p>กดปุ่ม “+ สร้าง ${meta.label}” เพื่อเริ่มสรุปเนื้อหาได้เลย!</p>
+    </div>`;
+    return;
+  }
+
+  if(unit._openItem && items.find(i=>i.id===unit._openItem)){
+    renderEditor(unit, items.find(i=>i.id===unit._openItem));
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.className='item-grid';
+  items.slice().sort((a,b)=>b.updatedAt-a.updatedAt).forEach(item=>{
+    const card = document.createElement('div');
+    card.className='sum-card';
+    let preview = '';
+    if(item.type==='note') preview = stripHtml(item.content).slice(0,140);
+    else if(item.type==='mindmap') preview = (item.content.nodes||[]).slice(1,6).map(n=>n.text).join(' · ');
+    else if(item.type==='flashcard') preview = (item.content.cards||[]).length + ' card(s) — ' + (item.content.cards||[]).slice(0,2).map(c=>c.front).join(' / ');
+    else if(item.type==='outline') preview = (item.content.items||[]).map(i=>i.text).join(' — ');
+    
+    card.innerHTML = `
+      <span class="sc-badge" style="background:${meta.color};color:${meta.text}">${meta.icon} ${meta.label}</span>
+      <div class="sc-title">${escapeHtml(item.title||'ไม่มีชื่อหัวข้อ')}</div>
+      <div class="sc-preview">${escapeHtml(preview)||'<i>ยังไม่ได้เขียนเนื้อหา</i>'}</div>
+      <div class="sc-meta">อัปเดต ${fmtDate(item.updatedAt)}</div>
+      <div class="folder-actions" style="top:10px; right:10px;">
+        <button class="folder-btn edit-btn" title="เปลี่ยนชื่อไฟล์">✎</button>
+        <button class="folder-btn del-btn" title="ลบไฟล์">✕</button>
+      </div>`;
+    
+    card.onclick = e=>{ if(e.target.closest('.folder-btn')) return; unit._openItem = item.id; renderContent(); };
+    
+    card.querySelector('.edit-btn').onclick = e=>{
+      e.stopPropagation(); // <-- บล็อกคลิกทะลุที่นี่แหละครับตัวการ!
+      openModal({title:'เปลี่ยนชื่อหัวข้อ', fields:[{name:'title',label:'ชื่อไฟล์',value:item.title}], submitLabel:'บันทึก',
+        onSubmit:v=>{ if(v.title.trim()){ item.title=v.title.trim(); item.updatedAt=now(); renderContent(); toast('บันทึกสำเร็จ'); } else {toast('กรุณาตั้งชื่อด้วยครับ');}}});
+    };
+    
+    card.querySelector('.del-btn').onclick = e=>{
+      e.stopPropagation(); // <-- บล็อกคลิกทะลุ!
+      openModal({title:'ลบไฟล์นี้ทิ้ง?', msg:`"${item.title||'ไม่มีชื่อหัวข้อ'}" จะถูกลบถาวร`, danger:true, submitLabel:'ลบทิ้ง',
+        onSubmit:()=>{ unit.summaries = unit.summaries.filter(x=>x.id!==item.id); renderContent(); toast('ลบสำเร็จ'); }});
+    };
+    grid.appendChild(card);
+  });
+  listWrap.appendChild(grid);
+}
+
+function createSummary(unit, type){
+  const item = {id:uid(), type, title:'', updatedAt:now()};
+  if(type==='note') item.content = '';
+if(type==='cornell') item.content = { 
+    pages: [{ id: uid(), sections: [{ id: uid(), cues: [{id:uid(), text:''}], notes: '' }], summary: '' }] 
+  };
+  if(type==='mindmap') item.content = {nodes:[{id:'r', text:unit.name, x:900, y:120, color:0, parentId:null, root:true}]};
+  if(type==='flashcard') item.content = {cards:[]};
+  if(type==='outline') item.content = {items:[{id:uid(), text:'', level:0}]};
+  unit.summaries.push(item);
+  unit._openItem = item.id;
+  renderContent();
+}
+
+/* ================= EDITOR ROUTER ================= */
+function renderEditor(unit, item){
+  const panel = document.getElementById('listWrap');
+  const meta = TYPES.find(t=>t.key===item.type);
+  
+  // 1. [UX FIX] สร้าง Tabs ให้ "ทุกประเภทไฟล์" ไม่ใช่แค่ Note ธรรมดาอีกต่อไป
+  const siblingFiles = unit.summaries.filter(s => s.type === item.type);
+  let tabsHtml = '';
+  if (siblingFiles.length > 0) {
+    tabsHtml = `<div class="editor-tabs">` + siblingFiles.map(s => `
+      <div class="editor-tab ${s.id === item.id ? 'active' : ''}" data-nav-file="${s.id}">
+        ${meta.icon} ${escapeHtml(s.title || 'ไม่มีชื่อ')}
+      </div>
+    `).join('') + `</div>`;
+  }
+
+  // 2. [LOGIC FIX] แสดงปุ่ม PDF ให้ทั้ง Note และ Cornell (เพราะเป็นกระดาษ A4 ทั้งคู่)
+  const showPdfBtn = (item.type === 'note' || item.type === 'cornell');
+
+  panel.innerHTML = `<div class="editor-shell" style="display:flex; flex-direction:column; height:100%;">
+    ${tabsHtml}
+    <div class="editor-head" style="flex-shrink:0;">
+      <button class="back-btn" id="backBtn" title="กลับหน้าสรุปไฟล์">←</button>
+      <input class="title-input" id="titleInput" placeholder="ตั้งชื่อ ${meta.label} ที่นี่..." value="${escapeHtml(item.title)}">
+      ${showPdfBtn ? `<button class="topbtn" id="pdfBtn" style="margin-right:8px; border-radius:8px; background:white; color:var(--ink-700);">📥 โหลดเป็น PDF</button>` : ''}
+      <button class="del-btn" id="delBtn">ลบทิ้ง</button>
+    </div>
+    <div id="editorBody" style="flex:1; display:flex; flex-direction:column; overflow:hidden;"></div>
+  </div>`;
+  
+  // ผูก Event สลับ Tabs สำหรับทุกประเภทไฟล์
+  panel.querySelectorAll('[data-nav-file]').forEach(tab => {
+    tab.onclick = () => { unit._openItem = tab.dataset.navFile; renderContent(); };
+  });
+  
+  // 3. [UX/LOGIC FIX] ระบบ Export PDF ที่ฉลาดขึ้น (รู้ว่ากำลังโหลด Note หรือ Cornell)
+  if (showPdfBtn) {
+    document.getElementById('pdfBtn').onclick = () => {
+      toast("กำลังสร้าง PDF... กรุณารอสักครู่ 🖨️");
+      
+      // หาเป้าหมายที่จะปริ้น (ถ้าเป็น Note ใช้ noteBody, ถ้าเป็น Cornell ใช้ pagesContainer)
+      const isCornell = item.type === 'cornell';
+      const printTarget = isCornell ? document.getElementById('pagesContainer') : document.getElementById('noteBody');
+      
+      if(!printTarget) return;
+
+      // จัดการ UI ก่อนปริ้นเพื่อความสวยงาม
+      const originalBg = printTarget.style.backgroundImage; 
+      const originalShadow = printTarget.style.boxShadow;
+      printTarget.style.backgroundImage = 'none'; // ซ่อนเส้นประ
+      printTarget.style.boxShadow = 'none'; // ซ่อนเงา
+      
+      // ถ้าเป็น Cornell ซ่อนปุ่มลบ/ปุ่มเพิ่มคีย์เวิร์ดชั่วคราวตอนปริ้น
+      if(isCornell) {
+         printTarget.querySelectorAll('.cue-del, .sec-del-btn, .cornell-add-btn').forEach(btn => btn.style.display = 'none');
+         printTarget.querySelectorAll('.cue-card').forEach(card => {
+             card.style.border = 'none'; card.style.boxShadow = 'none'; // เอาขอบการ์ดออกตอนปริ้น
+         });
+      }
+      
+      const opt = {
+        margin:       [10, 0, 10, 0], // เว้นขอบบนล่าง 10mm
+        filename:     `${item.title||'Summary'}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true }, 
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      
+      html2pdf().set(opt).from(printTarget).save().then(()=>{ 
+        toast("โหลด PDF สำเร็จ! 🎉"); 
+        // คืนค่า UI กลับมาหลังปริ้นเสร็จ
+        printTarget.style.backgroundImage = originalBg; 
+        printTarget.style.boxShadow = originalShadow;
+        if(isCornell) {
+           printTarget.querySelectorAll('.cue-del, .sec-del-btn, .cornell-add-btn').forEach(btn => btn.style.display = '');
+           printTarget.querySelectorAll('.cue-card').forEach(card => {
+               card.style.border = ''; card.style.boxShadow = ''; 
+           });
+        }
+      });
+    };
+  }
+
+  // ผูกปุ่มทั่วไป
+  document.getElementById('backBtn').onclick = ()=>{ 
+    unit._openItem = null; 
+    renderContent(); 
+  };
+  document.getElementById('titleInput').oninput = e=>{ item.title=e.target.value; item.updatedAt=now(); };
+  document.getElementById('titleInput').onblur = ()=>{ renderSidebar(); };
+  
+  document.getElementById('delBtn').onclick = ()=>{
+    openModal({title:'ลบไฟล์นี้ทิ้ง?', msg:`"${item.title||'ไม่มีชื่อหัวข้อ'}" จะถูกลบถาวร`, danger:true, submitLabel:'ลบทิ้ง',
+      onSubmit:()=>{ unit.summaries = unit.summaries.filter(x=>x.id!==item.id); unit._openItem=null; renderContent(); toast('ลบสำเร็จ'); }});
+  };
+
+  // เรียก Render เนื้อหาตามประเภท
+  if(item.type==='note') renderNoteEditor(item);
+  else if(item.type==='cornell') renderCornellEditor(item);
+  else if(item.type==='mindmap') renderMindmapEditor(item);
+  else if(item.type==='flashcard') renderFlashcardEditor(item);
+  else if(item.type==='outline') renderOutlineEditor(item);
+}
+
+/* ---- CORNELL EDITOR (PAGINATED & BLOCK-BASED) ---- */
+function renderCornellEditor(item){
+  const body = document.getElementById('editorBody');
+  
+  // 1. ตรวจสอบ/แปลงข้อมูลเก่าให้เป็นแบบหน้า (Pages)
+  if(!item.content || !item.content.pages) {
+    item.content = { pages: [{ id: uid(), sections: [{ id: uid(), cues: [{id:uid(), text:''}], notes: '' }], summary: '' }] };
+  }
+  
+  // โครงสร้าง Toolbar พื้นฐาน
+  body.innerHTML = `
+    <div class="toolbar" style="flex-shrink:0;">
+      ${tb('bold','B','<b>B</b>')}${tb('italic','I','<i>I</i>')}${tb('underline','U','<u>U</u>')}
+      <span class="sep"></span>
+      ${tbBlock('h2','H1')}${tbBlock('h3','H2')}${tbBlock('blockquote','❝')}
+      <span class="sep"></span>
+      ${tb('insertUnorderedList','• List','• ≡')}${tb('insertOrderedList','1. List','1.≡')}
+      <span class="sep"></span>
+      <button id="hiliteBtn" title="Highlight">🖊</button>
+      <input type="color" id="hiliteColor" value="#fdf0a8" title="Highlight color">
+      <input type="color" id="foreColor" value="#20293b" title="Text color">
+      <span class="sep"></span>
+      ${tb('removeFormat','Clear','⨯')}
+    </div>
+    
+    <div class="cornell-wrap" id="cornellWrap">
+      <div id="pagesContainer"></div>
+      <button class="add-page-btn" id="addPageBtn">+ เพิ่มหน้าถัดไป (New Page)</button>
+    </div>
+  `;
+
+  const pagesContainer = document.getElementById('pagesContainer');
+
+  // ฟังก์ชันวาดทุกหน้ากระดาษ
+  function drawCornellPages() {
+    pagesContainer.innerHTML = '';
+    
+    item.content.pages.forEach((page, pageIndex) => {
+      const pageEl = document.createElement('div');
+      pageEl.className = 'cornell-page';
+      
+      // ส่วนหัว และ ตัวคุม Sections
+      let html = `
+        <div class="cornell-page-num">PAGE ${pageIndex + 1}</div>
+        <div class="cornell-body" id="body_${page.id}"></div>
+      `;
+      
+      // ส่วนท้าย (Summary ของหน้านั้นๆ)
+      html += `
+        <div class="cornell-summary-zone">
+          <div style="font-family:'Prompt', sans-serif; font-weight:700; font-size:12px; color:var(--text-faint); margin-bottom:8px; text-transform:uppercase;">Summary (บทสรุปหน้านี้)</div>
+          <div class="cornell-notes-col" id="sum_${page.id}" contenteditable="true" data-placeholder="สรุปใจความสำคัญของหน้านี้..." style="padding:0; min-height:60px;">${page.summary || ''}</div>
+        </div>
+      `;
+      pageEl.innerHTML = html;
+      pagesContainer.appendChild(pageEl);
+
+      const bodyEl = pageEl.querySelector(`#body_${page.id}`);
+      
+      // วาด Section (คู่ Keyword <-> Notes)
+      page.sections.forEach((sec, secIndex) => {
+        const secEl = document.createElement('div');
+        secEl.className = 'cornell-section';
+        
+        // วาดการ์ด Keyword ฝั่งซ้าย
+        let cuesHtml = `<div class="cornell-cues-col" id="cues_${sec.id}">`;
+        sec.cues.forEach(cue => {
+          cuesHtml += `
+            <div class="cue-card">
+              <button class="cue-del" data-del-cue="${cue.id}" data-sec="${sec.id}" data-page="${page.id}">✕</button>
+              <textarea data-cue-text="${cue.id}" data-sec="${sec.id}" data-page="${page.id}" placeholder="คีย์เวิร์ด...">${escapeHtml(cue.text)}</textarea>
+            </div>
+          `;
+        });
+        // ปุ่มเพิ่ม Keyword ใน Section เดิม และปุ่มเพิ่ม Section ใหม่
+        cuesHtml += `
+          <button class="cornell-add-btn" data-add-cue="${sec.id}" data-page="${page.id}">+ เพิ่มคีย์เวิร์ด</button>
+          <div style="margin-top:20px;"></div>
+          <button class="cornell-add-btn" style="border-style:solid;" data-add-sec="${page.id}">+ เพิ่มเนื้อหาส่วนใหม่</button>
+        </div>`;
+        
+        // โซนจดเนื้อหาอธิบายฝั่งขวา
+        const notesHtml = `
+          <div class="cornell-notes-col" id="note_${sec.id}" contenteditable="true" data-placeholder="จดคำอธิบายสำหรับคีย์เวิร์ดด้านซ้าย...">${sec.notes || ''}</div>
+          ${page.sections.length > 1 ? `<button class="sec-del-btn" data-del-sec="${sec.id}" data-page="${page.id}" title="ลบเนื้อหาส่วนนี้">✕</button>` : ''}
+        `;
+        
+        secEl.innerHTML = cuesHtml + notesHtml;
+        bodyEl.appendChild(secEl);
+      });
+    });
+
+    bindCornellEvents();
+  }
+
+  // ผูก Event ทุกอย่างหลังจากวาดเสร็จ
+  function bindCornellEvents() {
+    let t;
+    const triggerSave = () => { clearTimeout(t); t = setTimeout(saveDataToModel, 400); };
+
+    // 1. ดักจับการพิมพ์ใน Notes และ Summary (อัปเดตข้อมูลเงียบๆ ไม่ต้องวาดใหม่)
+    item.content.pages.forEach(page => {
+      document.getElementById(`sum_${page.id}`).addEventListener('input', triggerSave);
+      page.sections.forEach(sec => {
+        document.getElementById(`note_${sec.id}`).addEventListener('input', triggerSave);
+      });
+    });
+
+    // 2. ดักจับการพิมพ์ในช่อง Keyword
+    document.querySelectorAll('[data-cue-text]').forEach(ta => {
+      ta.addEventListener('input', triggerSave);
+    });
+
+    // 3. ปุ่มกดเพิ่ม Keyword ใน Section เดิม
+    document.querySelectorAll('[data-add-cue]').forEach(btn => {
+      btn.onclick = () => {
+        const page = item.content.pages.find(p => p.id === btn.dataset.page);
+        const sec = page.sections.find(s => s.id === btn.dataset.addCue);
+        sec.cues.push({ id: uid(), text: '' });
+        saveDataToModel(); drawCornellPages(); // วาดใหม่เพื่อโชว์การ์ด
+      };
+    });
+
+    // 4. ปุ่มลบ Keyword
+    document.querySelectorAll('[data-del-cue]').forEach(btn => {
+      btn.onclick = () => {
+        const page = item.content.pages.find(p => p.id === btn.dataset.page);
+        const sec = page.sections.find(s => s.id === btn.dataset.sec);
+        if(sec.cues.length > 1) { // บังคับให้เหลืออย่างน้อย 1 ใบ
+          sec.cues = sec.cues.filter(c => c.id !== btn.dataset.delCue);
+          saveDataToModel(); drawCornellPages();
+        } else { toast("ต้องมีอย่างน้อย 1 คีย์เวิร์ดครับ"); }
+      };
+    });
+
+    // 5. ปุ่มเพิ่ม Section ใหม่ (คู่เนื้อหาใหม่)
+    document.querySelectorAll('[data-add-sec]').forEach(btn => {
+      btn.onclick = () => {
+        const page = item.content.pages.find(p => p.id === btn.dataset.addSec);
+        page.sections.push({ id: uid(), cues: [{id:uid(), text:''}], notes: '' });
+        saveDataToModel(); drawCornellPages();
+      };
+    });
+
+    // 6. ปุ่มลบ Section ทิ้ง
+    document.querySelectorAll('[data-del-sec]').forEach(btn => {
+      btn.onclick = () => {
+        const page = item.content.pages.find(p => p.id === btn.dataset.page);
+        page.sections = page.sections.filter(s => s.id !== btn.dataset.delSec);
+        saveDataToModel(); drawCornellPages();
+      };
+    });
+  }
+
+  // ฟังก์ชันกวาดข้อมูลจากหน้าจอเข้าไปเก็บใน Object
+  function saveDataToModel() {
+    item.content.pages.forEach(page => {
+      page.summary = document.getElementById(`sum_${page.id}`).innerHTML;
+      page.sections.forEach(sec => {
+        sec.notes = document.getElementById(`note_${sec.id}`).innerHTML;
+        sec.cues.forEach(cue => {
+          const ta = document.querySelector(`textarea[data-cue-text="${cue.id}"]`);
+          if(ta) cue.text = ta.value;
+        });
+      });
+    });
+    item.updatedAt = now();
+  }
+
+  // ปุ่มเปิดหน้ากระดาษ A4 แผ่นใหม่
+  document.getElementById('addPageBtn').onclick = () => {
+    saveDataToModel(); // เซฟหน้าปัจจุบันก่อน
+    item.content.pages.push({ id: uid(), sections: [{ id: uid(), cues: [{id:uid(), text:''}], notes: '' }], summary: '' });
+    drawCornellPages();
+    // เลื่อนจอลงไปหน้าใหม่
+    const wrap = document.getElementById('cornellWrap');
+    wrap.scrollTo({ top: wrap.scrollHeight, behavior: 'smooth' });
+  };
+
+  drawCornellPages(); // เรียกวาดครั้งแรก
+
+  // ผูก Toolbar ให้ทำงานกับกรอบที่กำลังคลิกพิมพ์อยู่
+  function exec(cmd, val){ 
+    document.execCommand(cmd, false, val||null); 
+    if(document.activeElement.isContentEditable) document.activeElement.focus();
+    saveDataToModel(); 
+  }
+  body.querySelectorAll('[data-cmd]').forEach(b=> b.onclick = ()=> exec(b.dataset.cmd));
+  body.querySelectorAll('[data-block]').forEach(b=> b.onclick = ()=> exec('formatBlock', b.dataset.block));
+  document.getElementById('hiliteBtn').onclick = ()=> exec('hiliteColor', document.getElementById('hiliteColor').value);
+  document.getElementById('hiliteColor').oninput = e=> exec('hiliteColor', e.target.value);
+  document.getElementById('foreColor').oninput = e=> exec('foreColor', e.target.value);
+}
+
+/* ---- NOTE EDITOR ---- */
+function renderNoteEditor(item){
+  const body = document.getElementById('editorBody');
+  body.innerHTML = `
+    <div class="toolbar" style="flex-shrink:0;">
+      ${tb('bold','B','<b>B</b>')}${tb('italic','I','<i>I</i>')}${tb('underline','U','<u>U</u>')}${tb('strikeThrough','S','<s>S</s>')}
+      <span class="sep"></span>
+      ${tbBlock('h2','H1')}${tbBlock('h3','H2')}${tbBlock('blockquote','❝')}${tbBlock('pre','&lt;/&gt;')}
+      <span class="sep"></span>
+      
+      <!-- เลือกขนาดตัวอักษร -->
+      <select id="fontSizeSel" style="border:1px solid var(--paper-line); border-radius:4px; font-family:'Prompt', sans-serif; font-size:13px; color:var(--ink-700); cursor:pointer; padding:2px; outline:none; background:transparent;">
+        <option value="3" selected>ขนาดปกติ</option>
+        <option value="4">ใหญ่</option>
+        <option value="5">ใหญ่มาก</option>
+        <option value="6">หัวข้อใหญ่</option>
+      </select>
+      <span class="sep"></span>
+
+      ${tb('insertUnorderedList','• List','• ≡')}${tb('insertOrderedList','1. List','1.≡')}
+      <span class="sep"></span>
+      <button id="linkBtn" title="แทรกลิงก์ (Hyperlink)">🔗</button>
+      <button id="hiliteBtn" title="Highlight">🖊</button>
+      <input type="color" id="hiliteColor" value="#fdf0a8" title="Highlight color">
+      <input type="color" id="foreColor" value="#20293b" title="Text color">
+      <span class="sep"></span>
+      ${tb('removeFormat','Clear','⨯')}
+      <span class="sep"></span>
+      <button id="imgBtn" title="Insert Image">🖼️</button>
+      <button id="mathBtn" title="Insert Math Formula (LaTeX)">∑</button>
+      <button id="tableBtn" title="Insert Table">📊</button>
+      <button id="checkBtn" title="Insert Checklist">☑</button>
+      <span class="sep"></span>
+      <button id="noteToCardBtn" title="สร้าง Flashcard จากข้อความ" style="color:var(--amber-deep); width:auto; padding:0 8px;">⚡ To Card</button>
+    </div>
+    
+    <!-- กระดาษ A4 เสมือนจริง -->
+    <div class="note-paper-wrap">
+      <div class="note-body" id="noteBody" contenteditable="true" data-placeholder="เริ่มพิมพ์สรุปเนื้อหาที่นี่... ลากคลุมข้อความแล้วใช้เครื่องมือด้านบนตกแต่งได้เลย"></div>
+    </div>`;
+
+  const nb = document.getElementById('noteBody');
+  nb.innerHTML = item.content || '';
+  
+  function exec(cmd, val){ document.execCommand(cmd, false, val||null); nb.focus(); save(); }
+  body.querySelectorAll('[data-cmd]').forEach(b=> b.onclick = ()=> exec(b.dataset.cmd));
+  body.querySelectorAll('[data-block]').forEach(b=> b.onclick = ()=> exec('formatBlock', b.dataset.block));
+  
+  // เปลี่ยนขนาดฟอนต์
+  document.getElementById('fontSizeSel').onchange = e => { exec('fontSize', e.target.value); };
+  
+  // แทรกลิงก์
+  document.getElementById('linkBtn').onclick = () => {
+    const url = prompt("ใส่ URL ที่ต้องการลิงก์ (เช่น https://www.google.com):");
+    if(url) exec('createLink', url);
+  };
+
+  document.getElementById('hiliteBtn').onclick = ()=> exec('hiliteColor', document.getElementById('hiliteColor').value);
+  document.getElementById('hiliteColor').oninput = e=> exec('hiliteColor', e.target.value);
+  document.getElementById('foreColor').oninput = e=> exec('foreColor', e.target.value);
+
+// ระบบบีบอัดรูปภาพอัตโนมัติ (Image Compression) ก่อนแทรกลงโน้ต
+  document.getElementById('imgBtn').onclick = () => {
+    let fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/*';
+    fileInput.onchange = e => {
+      let file = e.target.files[0]; let reader = new FileReader();
+      reader.onload = (event) => { 
+        let img = new Image();
+        img.onload = () => {
+          let canvas = document.createElement('canvas');
+          let MAX_WIDTH = 800; // บีบอัดความกว้างสูงสุดไม่เกิน 800px
+          let scale = img.width > MAX_WIDTH ? MAX_WIDTH / img.width : 1;
+          canvas.width = img.width * scale; canvas.height = img.height * scale;
+          let ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          // แปลงกลับเป็น JPEG คุณภาพ 75% ลดขนาดไฟล์มหาศาล!
+          let compressed = canvas.toDataURL('image/jpeg', 0.75);
+          exec('insertHTML', `<img src="${compressed}" style="max-width:100%; border-radius:8px;"><br>`); 
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }; fileInput.click();
+  };
+  document.getElementById('mathBtn').onclick = () => {
+    let formula = prompt("ใส่สูตร LaTeX (เช่น E=mc^2 หรือ \\frac{a}{b}):");
+    if(formula) {
+      try {
+        let html = katex.renderToString(formula, {throwOnError: false});
+        exec('insertHTML', `<span contenteditable="false" style="padding:0 4px; display:inline-block;">${html}</span>&nbsp;`);
+      } catch(e) { alert("สูตร LaTeX ไม่ถูกต้อง"); }
+    }
+  };
+  document.getElementById('tableBtn').onclick = () => {
+    exec('insertHTML', `<table style="width:100%; border-collapse: collapse; margin: 10px 0;" border="1"><tr><th style="padding:8px;">หัวข้อ</th><th style="padding:8px;">รายละเอียด</th></tr><tr><td style="padding:8px;"><br></td><td style="padding:8px;"><br></td></tr></table><br>`);
+  };
+  document.getElementById('checkBtn').onclick = () => {
+    exec('insertHTML', `<input type="checkbox" style="margin-right:6px;"><span style="outline:none;">พิมพ์งานที่ต้องทำ...</span><br>`);
+  };
+  document.getElementById('noteToCardBtn').onclick = () => {
+    const selection = window.getSelection().toString();
+    if(!selection) { toast("กรุณาคลุมดำข้อความที่ต้องการตั้งเป็นคำถามก่อน!"); return; }
+    let answer = prompt(`สร้างการ์ดจากคำถาม: "${selection}"\nกรุณาพิมพ์ "คำตอบ":`);
+    if(answer) {
+      const unit = currentUnit();
+      let fcItem = unit.summaries.find(s => s.type === 'flashcard');
+      if(!fcItem) {
+        fcItem = {id:uid(), type:'flashcard', title:'Auto-generated Cards', content:{cards:[]}, updatedAt:now()};
+        unit.summaries.push(fcItem);
+      }
+      fcItem.content.cards.push({ id:uid(), front: selection, back: answer, reps: 0, ease: 2.5, interval: 0, nextReview: now() });
+      toast("สร้าง Flashcard สำเร็จ!");
+    }
+  };
+  let t;
+  nb.addEventListener('input', ()=>{ clearTimeout(t); t=setTimeout(save, 400); });
+  function save(){ item.content = nb.innerHTML; item.updatedAt = now(); }
+}
+function tb(cmd,title,label){ return `<button data-cmd="${cmd}" title="${title}">${label}</button>`; }
+function tbBlock(block,label){ return `<button data-block="${block}" title="${block}">${label}</button>`; }
+
+/* ---- MIND MAP EDITOR (REAL-TIME AUTO-LAYOUT & AUTO-PAN) ---- */
+function renderMindmapEditor(item){
+  const body = document.getElementById('editorBody');
+  body.innerHTML = `
+    <div class="mm-toolbar">
+      <button id="mmAddRoot">+ เพิ่มหัวข้อหลัก</button>
+      <button id="mmCenter" style="color:var(--sage-deep); border-color:var(--sage); background:rgba(107, 143, 113, 0.1);">🎯 กลับจุดศูนย์กลาง</button>
+      <span class="sep"></span>
+      <button id="mmZoomOut">-</button><span id="mmZoomVal" style="font-size:12px; font-weight:bold; min-width:40px; text-align:center;">100%</span><button id="mmZoomIn">+</button>
+      <button id="mmExport" style="margin-left:8px;">💾 Export PNG</button>
+      <span class="hint">คีย์ลัด: กด Tab (แตกกิ่งย่อย) | กด Enter (เพิ่มระดับเดียวกัน)</span>
+    </div>
+    <div class="mm-viewport" id="mmViewport"><div class="mm-canvas" id="mmCanvas" style="width:4000px; height:3000px;"><svg id="mmSvg"></svg></div></div>`;
+  
+  const canvas = document.getElementById('mmCanvas');
+  const viewport = document.getElementById('mmViewport');
+  let selectedNode = item.content.nodes.find(n=>n.root) ? item.content.nodes[0].id : null;
+  
+  let zoomLevel = 1;
+  const updateZoom = () => { canvas.style.transform = `scale(${zoomLevel})`; canvas.style.transformOrigin = '0 0'; document.getElementById('mmZoomVal').innerText = Math.round(zoomLevel*100)+'%'; };
+  
+  viewport.addEventListener('wheel', e => { if(e.ctrlKey||e.metaKey){ e.preventDefault(); zoomLevel += e.deltaY*-0.001; zoomLevel = Math.min(Math.max(0.3, zoomLevel),3); updateZoom(); } });
+  document.getElementById('mmZoomIn').onclick = () => { zoomLevel += 0.1; updateZoom(); };
+  document.getElementById('mmZoomOut').onclick = () => { zoomLevel -= 0.1; updateZoom(); };
+  document.getElementById('mmExport').onclick = () => {
+    toast("กำลังสร้างรูปภาพ..."); html2canvas(canvas, { backgroundColor: '#f6f2ea' }).then(cvs => { let a = document.createElement('a'); a.href = cvs.toDataURL("image/png"); a.download = `MindMap_${item.title||'Untitled'}.png`; a.click(); });
+  };
+
+  viewport.addEventListener('mousedown', e=>{
+    if(e.target.closest('.mm-node') || e.target.closest('.mm-collapse-btn')) return; 
+    const startX=e.clientX, startY=e.clientY, startLeft=viewport.scrollLeft, startTop=viewport.scrollTop;
+    viewport.classList.add('panning');
+    let moved=false;
+    function mv(ev){ moved=true; viewport.scrollLeft = startLeft - (ev.clientX-startX); viewport.scrollTop = startTop - (ev.clientY-startY); }
+    function up(){ viewport.classList.remove('panning'); document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); }
+    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+  });
+
+  // --- 1. ฟังก์ชันจัดระเบียบอัตโนมัติ (Auto-Layout Core) ---
+  function applyAutoLayout() {
+    const root = item.content.nodes.find(n => n.root);
+    if(!root) return;
+    const gapX = 240; const gapY = 60;
+    function calcHeight(nodeId) {
+      const node = item.content.nodes.find(n => n.id === nodeId);
+      const kids = item.content.nodes.filter(n => n.parentId === nodeId && !node.collapsed);
+      if(kids.length === 0) { node._h = gapY; } 
+      else { node._h = kids.reduce((sum, kid) => sum + calcHeight(kid.id), 0); }
+      return node._h;
+    }
+    function layout(nodeId, x, startY) {
+      const node = item.content.nodes.find(n => n.id === nodeId);
+      node.x = x; node.y = startY + (node._h / 2) - 20;
+      const kids = item.content.nodes.filter(n => n.parentId === nodeId && !node.collapsed);
+      let currY = startY;
+      kids.forEach(kid => { layout(kid.id, x + gapX, currY); const kNode = item.content.nodes.find(n => n.id === kid.id); currY += kNode._h; });
+    }
+    calcHeight(root.id);
+    layout(root.id, root.x, root.y - (root._h / 2)); // วางโดยยึดตำแหน่ง root ปัจจุบันเป็นหลัก
+  }
+
+  // --- 2. ฟังก์ชันกล้องวิ่งตาม (Auto-Pan / Center Camera) ---
+  function focusNode(nodeId) {
+    const node = item.content.nodes.find(n => n.id === nodeId);
+    if(!node) return;
+    // คำนวณหาจุดกึ่งกลางของหน้าจอ
+    const targetX = (node.x * zoomLevel) - (viewport.clientWidth / 2) + 120; // 120 คือ offset เผื่อความกว้างโหนด
+    const targetY = (node.y * zoomLevel) - (viewport.clientHeight / 2) + 30;
+    viewport.scrollTo({ left: Math.max(0, targetX), top: Math.max(0, targetY), behavior: 'smooth' });
+  }
+
+  document.getElementById('mmCenter').onclick = () => {
+    const root = item.content.nodes.find(n => n.root);
+    if(root) focusNode(root.id);
+  };
+  document.getElementById('mmAddRoot').onclick = () => {
+    if(item.content.nodes.length > 0) { toast("มีหัวข้อหลักอยู่แล้วครับ! ให้แตกกิ่งย่อยแทนนะ"); return; }
+    addChildNode(null);
+  };
+
+  function addChildNode(parentId){
+    const base = parentId ? item.content.nodes.find(n=>n.id===parentId) : null;
+    if(base && base.collapsed) base.collapsed = false; // กางกิ่งแม่ก่อนเพิ่มลูก
+    
+    // ตั้งค่าเริ่มต้น (แต่เดี๋ยว Auto-Layout จะจัดการวางให้ใหม่เอง)
+    const nn = {id:uid(), text:'', x: base ? base.x + 200 : 1800, y: base ? base.y : 1500, color: base ? base.color : Math.floor(Math.random()*NODE_COLORS.length), parentId: parentId, root: !base && item.content.nodes.length===0, collapsed: false};
+    item.content.nodes.push(nn);
+    selectedNode = nn.id;
+    
+    applyAutoLayout(); // จัดระเบียบทันทีที่สร้าง
+    item.updatedAt = now();
+    draw();
+    
+    setTimeout(() => { 
+      focusNode(nn.id); // กล้องวิ่งตามไปที่กิ่งใหม่ทันที!
+      const txt = canvas.querySelector(`.mm-node[data-id="${nn.id}"] .txt`); 
+      if(txt) { txt.contentEditable = 'true'; txt.focus(); } 
+    }, 50);
+  }
+
+  function isVisible(node) {
+    let curr = node;
+    while(curr.parentId) {
+      let p = item.content.nodes.find(n => n.id === curr.parentId);
+      if(!p) break;
+      if(p.collapsed) return false;
+      curr = p;
+    }
+    return true;
+  }
+
+  function draw(){
+    canvas.querySelectorAll('.mm-node').forEach(n=>n.remove());
+    const visibleNodes = item.content.nodes.filter(n => isVisible(n));
+
+    visibleNodes.forEach(node=>{
+      const el = document.createElement('div');
+      el.className = 'mm-node' + (node.root?' root':'') + (node.id===selectedNode?' selected':'');
+      el.style.left = node.x+'px'; el.style.top = node.y+'px';
+      el.style.background = NODE_COLORS[node.color||0];
+      el.dataset.id = node.id;
+      
+      const displayText = node.text === '' ? '<span style="color:rgba(0,0,0,0.3);">พิมพ์หัวข้อ...</span>' : escapeHtml(node.text);
+      
+      const kids = item.content.nodes.filter(n => n.parentId === node.id);
+      let collapseBtnHtml = '';
+      if(kids.length > 0) {
+        collapseBtnHtml = `<div class="mm-collapse-btn" data-act="collapse" title="ยุบ/ขยายกิ่ง">${node.collapsed ? kids.length : '−'}</div>`;
+      }
+
+      el.innerHTML = `<span class="txt" contenteditable="false" style="display:inline-block; width:100%; min-height:20px;">${displayText}</span>
+        ${collapseBtnHtml}
+        <div class="ctrl">
+          <button data-act="add" title="แตกกิ่งย่อย (Tab)">+</button>
+          <button data-act="color" title="เปลี่ยนสี">🎨</button>
+          ${node.root?'':'<button data-act="del" title="ลบโหนดทิ้ง">✕</button>'}
+        </div>`;
+      canvas.appendChild(el);
+
+      const collBtn = el.querySelector('[data-act="collapse"]');
+      if(collBtn) {
+        collBtn.addEventListener('pointerdown', e => {
+          e.stopPropagation();
+          node.collapsed = !node.collapsed;
+          applyAutoLayout(); // จัดระเบียบใหม่เมื่อพับ/กาง
+          item.updatedAt = now(); draw(); focusNode(node.id); // เลื่อนกล้องกลับมาหาโหนดหลัก
+        });
+      }
+
+      el.addEventListener('pointerdown', e => {
+        if(e.target.closest('.ctrl') || e.target.closest('.mm-collapse-btn') || e.target.isContentEditable) return;
+        e.stopPropagation(); el.setPointerCapture(e.pointerId); 
+        selectedNode = node.id;
+        canvas.querySelectorAll('.mm-node').forEach(n=>n.classList.remove('selected'));
+        el.classList.add('selected');
+
+        const startX = e.clientX, startY = e.clientY;
+        let dropTarget = null, isDragging = false; 
+
+        // ถ้าระบบ Auto Layout ทำงาน การลาก (Drag) จะเป็นการดึงเส้นโยงเพื่อหา Parent ใหม่เท่านั้น (ไม่ให้ตำแหน่งเละ)
+        const dummyLine = document.createElementNS('http://www.w3.org/2000/svg','path');
+        dummyLine.setAttribute('stroke', 'var(--amber)');
+        dummyLine.setAttribute('stroke-width', '2');
+        dummyLine.setAttribute('stroke-dasharray', '5,5');
+        dummyLine.setAttribute('fill', 'none');
+
+        const onPointerMove = (ev) => {
+          if (Math.abs(ev.clientX - startX) > 3 || Math.abs(ev.clientY - startY) > 3) {
+            isDragging = true;
+            if(!node.root && !document.getElementById('dummyLine')) {
+               document.getElementById('mmSvg').appendChild(dummyLine);
+            }
+          }
+          if (!isDragging || node.root) return;
+
+          // ลากเส้นประจากจุดเดิม ไปหาปลายเมาส์
+          const ax = node.x + (el.offsetWidth/2); const ay = node.y + (el.offsetHeight/2);
+          const bx = node.x + ((ev.clientX - startX) / zoomLevel); const by = node.y + ((ev.clientY - startY) / zoomLevel);
+          dummyLine.setAttribute('d', `M${ax},${ay} L${bx},${by}`);
+
+          el.style.pointerEvents = 'none'; 
+          const hoverEl = document.elementFromPoint(ev.clientX, ev.clientY);
+          el.style.pointerEvents = 'auto'; 
+          
+          const newTarget = hoverEl ? hoverEl.closest('.mm-node') : null;
+          if(dropTarget && dropTarget !== newTarget) dropTarget.style.outline = '';
+          if(newTarget && newTarget !== el && !node.root) {
+            dropTarget = newTarget;
+            dropTarget.style.outline = '3px solid var(--amber)'; dropTarget.style.outlineOffset = '2px'; dropTarget.style.borderRadius = '16px';
+          } else dropTarget = null;
+        };
+
+        const onPointerUp = (ev) => {
+          el.releasePointerCapture(e.pointerId);
+          el.removeEventListener('pointermove', onPointerMove); el.removeEventListener('pointerup', onPointerUp); el.removeEventListener('pointercancel', onPointerUp);
+          if(dummyLine.parentNode) dummyLine.remove();
+
+          if(dropTarget) {
+            const newParentId = dropTarget.dataset.id;
+            if(newParentId !== node.parentId) { node.parentId = newParentId; toast("เปลี่ยนการเชื่อมโยงสำเร็จ ✨"); }
+            dropTarget.style.outline = ''; 
+          }
+          
+          if(isDragging) {
+             applyAutoLayout(); // จัดระเบียบใหม่ทันทีหลังย้ายเสร็จ
+             item.updatedAt=now(); draw(); 
+          }
+        };
+
+        el.addEventListener('pointermove', onPointerMove); el.addEventListener('pointerup', onPointerUp); el.addEventListener('pointercancel', onPointerUp);
+      });
+
+      const txt = el.querySelector('.txt');
+      const startEdit = () => { txt.contentEditable = 'true'; txt.focus(); document.execCommand('selectAll',false,null); };
+
+      txt.addEventListener('dblclick', (e) => { e.stopPropagation(); startEdit(); });
+      let lastTap = 0;
+      txt.addEventListener('touchstart', (e) => {
+        const currentTime = new Date().getTime(); const tapLength = currentTime - lastTap;
+        if (tapLength < 300 && tapLength > 0) { e.preventDefault(); e.stopPropagation(); startEdit(); }
+        lastTap = currentTime;
+      });
+
+      txt.addEventListener('blur', ()=>{ 
+        txt.contentEditable='false'; 
+        node.text = txt.innerText.trim() === 'พิมพ์หัวข้อ...' ? '' : txt.innerText.trim(); 
+        if(node.text === '') node.text = 'ไอเดียใหม่'; 
+        applyAutoLayout(); item.updatedAt=now(); draw(); 
+      });
+      
+      txt.addEventListener('keydown', e=>{ 
+        if(e.key === 'Enter' && !e.shiftKey) { 
+          e.preventDefault(); txt.blur(); 
+          if(!node.root) addChildNode(node.parentId);
+        }
+        if(e.key === 'Tab') { e.preventDefault(); txt.blur(); addChildNode(node.id); }
+      });
+
+      el.querySelector('[data-act="add"]').onclick = e=>{ e.stopPropagation(); addChildNode(node.id); };
+      const colorBtn = el.querySelector('[data-act="color"]');
+      if(colorBtn) colorBtn.onclick = e=>{ e.stopPropagation(); node.color = ((node.color||0)+1)%NODE_COLORS.length; item.updatedAt=now(); draw(); };
+      const delBtn = el.querySelector('[data-act="del"]');
+      if(delBtn) delBtn.onclick = e=>{ 
+        e.stopPropagation(); 
+        const kids = item.content.nodes.filter(n=>n.parentId===node.id);
+        if(kids.length > 0) {
+            openModal({title:'ลบกิ่งนี้ทิ้ง?', msg:`กิ่งย่อยทั้งหมดจะหายไปถาวร!`, danger:true, submitLabel:'ลบ', onSubmit:()=>{ deleteSubtree(node.id); applyAutoLayout(); draw(); }});
+        } else { deleteSubtree(node.id); applyAutoLayout(); draw(); focusNode(node.parentId); }
+      };
+    });
+    
+    drawLines(visibleNodes);
+  }
+
+  function deleteSubtree(id){
+    const kids = item.content.nodes.filter(n=>n.parentId===id).map(n=>n.id);
+    kids.forEach(k=>deleteSubtree(k));
+    item.content.nodes = item.content.nodes.filter(n=>n.id!==id);
+    item.updatedAt = now();
+  }
+
+  function drawLines(visibleNodes){
+    const svg = document.getElementById('mmSvg');
+    svg.innerHTML = '';
+    visibleNodes.forEach(node=>{
+      if(!node.parentId) return;
+      const a = canvas.querySelector(`.mm-node[data-id="${node.parentId}"]`);
+      const b = canvas.querySelector(`.mm-node[data-id="${node.id}"]`);
+      if(!a||!b) return;
+      
+      const ax = a.offsetLeft + a.offsetWidth;
+      const ay = a.offsetTop + (a.offsetHeight/2);
+      const bx = b.offsetLeft;
+      const by = b.offsetTop + (b.offsetHeight/2);
+      
+      const cp1x = ax + (bx - ax) / 2.5; const cp1y = ay;
+      const cp2x = bx - (bx - ax) / 2.5; const cp2y = by;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.setAttribute('d', `M${ax},${ay} C${cp1x},${cp1y} ${cp2x},${cp2y} ${bx},${by}`);
+      svg.appendChild(path);
+    });
+  }
+  
+  if(item.content.nodes.length===0) { addChildNode(null); } 
+  else { 
+      // โหลดไฟล์เก่าปุ๊บ จัดระเบียบและเล็งกล้องไปที่ Root ทันที
+      applyAutoLayout(); 
+      draw(); 
+      setTimeout(()=> { 
+        const root = item.content.nodes.find(n => n.root);
+        if(root) focusNode(root.id);
+      }, 100);
+  }
+}
+
+/* ---- FLASHCARD EDITOR (อัปเกรด UX แบบตารางรายการ) ---- */
+function renderFlashcardEditor(item){
+  const body = document.getElementById('editorBody');
+  
+  // 1. สร้างโครงสร้างหน้าจัดการการ์ด (มีปุ่ม Study Mode ด้านบน)
+  body.innerHTML = `
+    <div style="padding: 14px 24px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--paper-line); background:var(--paper-raised);">
+      <span style="font-size:15px; color:var(--ink-900); font-weight:600;">📝 จัดการชุดการ์ดคำถาม-คำตอบ</span>
+      <button id="studyBtn" style="background:var(--ink-900); color:white; padding:10px 18px; border:none; border-radius:var(--radius-m); font-weight:600; cursor:pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">🧠 เริ่มทบทวน (Study Mode)</button>
+    </div>
+    <div style="padding:24px; max-width:900px; margin:0 auto;">
+      <div id="fcList" style="display:flex; flex-direction:column; gap:16px;"></div>
+      <button id="fcAddBtn" style="margin-top:20px; width:100%; padding:14px; border:2px dashed var(--paper-line); border-radius:var(--radius-m); background:transparent; color:var(--text-soft); font-weight:600; cursor:pointer; font-size:15px; transition: 0.2s;">+ เพิ่มการ์ดใหม่</button>
+    </div>`;
+    
+  const list = document.getElementById('fcList');
+
+  // 2. ฟังก์ชันวาดรายการคำถาม-คำตอบ (List View)
+  function draw() {
+    list.innerHTML = '';
+    (item.content.cards || []).forEach((card, idx) => {
+      const row = document.createElement('div');
+      // กล่องแต่ละแถว
+      row.style.cssText = "display:flex; gap:16px; background:var(--paper-raised); padding:16px; border-radius:var(--radius-m); border:1px solid var(--paper-line); align-items:flex-start; box-shadow:var(--shadow-card); transition: all 0.3s var(--bounce);";
+      
+      row.innerHTML = `
+        <div style="font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:bold; color:var(--text-faint); margin-top:10px; width:24px; text-align:center;">${idx+1}</div>
+        
+        <div style="flex:1;">
+          <div class="fc-label" style="margin-bottom:8px; color:var(--ink-700); font-weight:600;">คำถาม (Front)</div>
+          <textarea data-f="front" placeholder="พิมพ์คำถามที่นี่..." style="width:100%; min-height:80px; padding:12px; border:1px solid var(--paper-line); border-radius:var(--radius-s); font-family:inherit; font-size:15px; resize:vertical; outline:none; background:transparent; transition: 0.2s;">${escapeHtml(card.front)}</textarea>
+        </div>
+        
+        <div style="flex:1;">
+          <div class="fc-label" style="margin-bottom:8px; color:var(--ink-700); font-weight:600;">คำตอบ (Back)</div>
+          <textarea data-f="back" placeholder="พิมพ์คำตอบที่นี่..." style="width:100%; min-height:80px; padding:12px; border:1px solid var(--paper-line); border-radius:var(--radius-s); font-family:inherit; font-size:15px; resize:vertical; outline:none; background:transparent; transition: 0.2s;">${escapeHtml(card.back)}</textarea>
+        </div>
+        
+        <button data-act="del" style="background:#fbeee9; color:var(--coral); border:none; width:36px; height:36px; border-radius:8px; cursor:pointer; margin-top:28px; font-size:16px; transition:0.2s;" title="ลบการ์ดใบนี้">✕</button>
+      `;
+      
+      // อัปเดตข้อมูลอัตโนมัติเมื่อพิมพ์
+      row.querySelectorAll('textarea').forEach(ta => {
+        ta.addEventListener('input', e => {
+          card[e.target.dataset.f] = e.target.value;
+          item.updatedAt = now();
+        });
+        // ใส่ Effect ตอนคลิกพิมพ์
+        ta.addEventListener('focus', e => { e.target.style.borderColor = 'var(--amber-deep)'; e.target.style.background = '#fff'; });
+        ta.addEventListener('blur', e => { e.target.style.borderColor = 'var(--paper-line)'; e.target.style.background = 'transparent'; });
+      });
+
+      // ปุ่มลบการ์ด
+      row.querySelector('[data-act="del"]').onclick = (e) => {
+        item.content.cards = item.content.cards.filter(c => c.id !== card.id);
+        item.updatedAt = now();
+        draw(); // วาดใหม่
+      };
+
+      list.appendChild(row);
+    });
+    
+    // กรณีที่ยังไม่มีการ์ดเลย
+    if((item.content.cards || []).length === 0) {
+      list.innerHTML = `<div style="text-align:center; padding:50px 20px; color:var(--text-faint); border: 2px dashed var(--paper-line); border-radius: var(--radius-m); background:transparent;">ยูนิตนี้ยังไม่มีการ์ด<br>กดปุ่ม <b>+ เพิ่มการ์ดใหม่</b> ด้านล่างเพื่อเริ่มสร้างเลย!</div>`;
+    }
+  }
+
+  // ผูกปุ่มเพิ่มการ์ด
+  document.getElementById('fcAddBtn').onclick = () => {
+    item.content.cards = item.content.cards || [];
+    item.content.cards.push({id:uid(), front:'', back:'', reps:0, ease:2.5, interval:0, nextReview:0});
+    item.updatedAt = now();
+    draw();
+    // โฟกัส (เคอร์เซอร์กระพริบ) ที่ช่องคำถามของการ์ดใบใหม่ทันที
+    setTimeout(() => {
+      const textareas = list.querySelectorAll('textarea[data-f="front"]');
+      if(textareas.length > 0) textareas[textareas.length - 1].focus();
+    }, 50);
+  };
+
+  draw(); // เรียกวาดครั้งแรก
+
+  // 3. ระบบโหมดทดสอบ (Spaced Repetition) — ยังคงความ 3D เด้งๆ ไว้ที่นี่
+  document.getElementById('studyBtn').onclick = () => {
+    // กรองเอาเฉพาะการ์ดที่ถึงเวลาต้องทวน (หรือยังไม่เคยทวน)
+    const cardsToStudy = (item.content.cards || []).filter(c => !c.nextReview || c.nextReview <= now());
+    if(cardsToStudy.length === 0) { toast("🎉 เก่งมาก! คุณทบทวนการ์ดของวันนี้ครบหมดแล้ว"); return; }
+    
+    let currentIdx = 0;
+    function renderStudyCard() {
+      if(currentIdx >= cardsToStudy.length) { closeModal(); toast("จบการทดสอบรอบนี้!"); item.updatedAt=now(); draw(); return; }
+      
+      let c = cardsToStudy[currentIdx];
+      const root = document.getElementById('modalRoot');
+      root.innerHTML = `
+        <div class="modal-overlay" id="studyOverlay" style="background:rgba(15,23,42,0.85); backdrop-filter:blur(4px);">
+          <div class="fc-card" style="width:360px; height:360px; margin:auto; perspective:1200px;" id="studyCard">
+             <div class="fc-inner" style="transition: transform 0.6s var(--bounce, ease); transform-style: preserve-3d; width:100%; height:100%;">
+                
+                <div class="fc-face fc-front" style="display:flex; flex-direction:column; padding:28px; font-size:22px; text-align:center; background:white; border-radius:16px; box-shadow:0 20px 40px rgba(0,0,0,0.2);">
+                  <div class="fc-label" style="text-align:left; color:var(--text-faint); margin-bottom:16px;">QUESTION</div>
+                  <div style="margin:auto; word-break:break-word; white-space:pre-wrap;">${escapeHtml(c.front)}</div>
+                  <button id="flipActionBtn" style="margin-top:auto; padding:14px; border-radius:12px; border:none; background:var(--ink-900); color:white; font-weight:600; cursor:pointer; font-size:16px;">แตะเพื่อดูคำตอบ</button>
+                </div>
+                
+                <div class="fc-face fc-back" style="display:flex; flex-direction:column; padding:28px; font-size:20px; text-align:center; background:white; border-radius:16px; box-shadow:0 20px 40px rgba(0,0,0,0.2);">
+                  <div class="fc-label" style="text-align:left; color:var(--text-faint); margin-bottom:16px;">ANSWER</div>
+                  <div style="margin:auto; overflow-y:auto; max-height:180px; word-break:break-word; white-space:pre-wrap;">${escapeHtml(c.back)}</div>
+                  
+                  <div style="margin-top:auto; display:flex; gap:8px;">
+                    <button class="ans-btn" data-q="1" style="flex:1; background:var(--coral); color:white; border:none; border-radius:8px; padding:12px; font-weight:600; cursor:pointer;">ลืม (Again)</button>
+                    <button class="ans-btn" data-q="3" style="flex:1; background:var(--amber-deep); color:white; border:none; border-radius:8px; padding:12px; font-weight:600; cursor:pointer;">พอได้ (Hard)</button>
+                    <button class="ans-btn" data-q="5" style="flex:1; background:var(--sage); color:white; border:none; border-radius:8px; padding:12px; font-weight:600; cursor:pointer;">จำได้ (Easy)</button>
+                  </div>
+                </div>
+
+</div>
+          </div>
+          <div style="position:absolute; top:24px; left:24px; color:rgba(255,255,255,0.7); font-weight:600; font-size:15px; font-family:'Prompt', sans-serif;">
+            🎯 ทบทวนไปแล้ว ${currentIdx} / ${cardsToStudy.length} ใบ
+          </div>
+          <button onclick="closeModal()" style="position:absolute; top:20px; right:24px; background:none; border:none; color:white; font-size:32px; cursor:pointer;">✕</button>
+        </div>`;
+      
+      // ปุ่มพลิกการ์ด
+      document.getElementById('flipActionBtn').onclick = () => document.getElementById('studyCard').classList.add('flipped');
+      
+      // คำนวณความจำ (SM-2 Algorithm)
+      root.querySelectorAll('.ans-btn').forEach(btn => {
+        btn.onclick = (e) => {
+          let quality = parseInt(e.target.dataset.q);
+          c.reps = c.reps || 0; c.ease = c.ease || 2.5; c.interval = c.interval || 0;
+          
+          if (quality < 3) { c.reps = 0; c.interval = 1; }
+          else {
+            if (c.reps === 0) c.interval = 1; else if (c.reps === 1) c.interval = 6;
+            else c.interval = Math.round(c.interval * c.ease);
+            c.reps++;
+          }
+          // คำนวณค่าความยากง่าย (Ease) ใหม่
+          c.ease = Math.max(1.3, c.ease + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)));
+          // กำหนดวันทบทวนรอบถัดไป (86400000 ms = 1 วัน)
+          c.nextReview = now() + (c.interval * 86400000); 
+          
+          currentIdx++; 
+          renderStudyCard(); // เรียกการ์ดใบต่อไป
+        };
+      });
+    }
+    renderStudyCard();
+  };
+}
+/* ---- OUTLINE EDITOR (UI/UX REVAMPED) ---- */
+function renderOutlineEditor(item){
+  const body = document.getElementById('editorBody');
+  
+  body.innerHTML = `
+    <div class="toolbar" style="flex-shrink:0; padding:12px 24px; background:var(--paper-raised); border-bottom:1px solid var(--paper-line); display:flex; justify-content:space-between; align-items:center;">
+      <span class="hint" style="font-size:13px; color:var(--text-soft); font-family:'Prompt', sans-serif;">
+        <b>💡 คีย์ลัด:</b> <kbd style="background:#eee; padding:2px 6px; border-radius:4px;">Enter</kbd> (บรรทัดใหม่) | <kbd style="background:#eee; padding:2px 6px; border-radius:4px;">Tab</kbd> (เลื่อนย่อหน้า) | ลาก <b style="letter-spacing:-2px;">⋮⋮</b> เพื่อสลับที่
+      </span>
+      <button id="olClearChecked" style="padding:6px 12px; border-radius:6px; background:var(--paper); border:1px solid var(--paper-line); font-size:12px; font-weight:600; color:var(--text-soft); cursor:pointer; transition:0.2s;">🧹 ลบ Task ที่เสร็จแล้ว</button>
+    </div>
+    
+    <div class="outline-wrap">
+      <div class="outline-container">
+        <h1 style="margin: 0 0 24px 64px; font-size: 28px; color: var(--ink-900); border-bottom: 2px solid var(--paper-line); padding-bottom: 12px;">${escapeHtml(item.title) || 'Outline'}</h1>
+        <div id="olRows"></div>
+        <button class="ol-add" id="olAdd">+ เพิ่มหัวข้อใหม่</button>
+      </div>
+    </div>
+    
+    <!-- เมนูลอยตัวตอนคลุมดำ (Floating Menu) -->
+    <div id="floatingMenuOutline">
+      <button data-fcmd="bold"><b>B</b></button>
+      <button data-fcmd="italic"><i>I</i></button>
+      <button data-fcmd="underline"><u>U</u></button>
+      <div style="width:1px; background:rgba(255,255,255,0.2); margin:0 4px;"></div>
+      <button data-fcmd="hiliteColor" value="#fdf0a8" style="color:#fdf0a8;">🖊 ไฮไลต์</button>
+    </div>
+  `;
+  
+  const rows = document.getElementById('olRows');
+  let draggedIdx = null;
+
+  function draw(){
+    rows.innerHTML = '';
+    let skipLevel = -1; 
+    
+    item.content.items.forEach((line, idx) => {
+      if(line.collapsed === undefined) line.collapsed = false;
+      if(line.isTask === undefined) line.isTask = false;
+      if(line.checked === undefined) line.checked = false;
+
+      if (skipLevel !== -1) {
+        if (line.level > skipLevel) return; 
+        else skipLevel = -1; 
+      }
+      if (line.collapsed) skipLevel = line.level;
+
+      const nextLine = item.content.items[idx + 1];
+      const hasChildren = nextLine && nextLine.level > line.level; 
+
+      const row = document.createElement('div');
+      row.className = 'ol-row';
+      row.draggable = true;
+      row.dataset.idx = idx;
+      row.style.paddingLeft = (line.level * 36) + 'px'; // เลื่อนย่อหน้าให้กว้างขึ้น ดูง่ายขึ้น
+      
+      // วาดเส้นไกด์ไลน์ (Tree Line) ระบุความเป็นพ่อลูก
+      let guidesHtml = '';
+      for(let i=1; i<=line.level; i++) {
+         guidesHtml += `<div class="ol-guide" style="left: ${i * 36 + 18}px;"></div>`;
+      }
+
+      let arrowClass = 'ol-collapse';
+      if (!hasChildren) arrowClass += ' hidden';
+      if (line.collapsed) arrowClass += ' is-collapsed';
+
+      let bulletHtml = line.isTask 
+        ? `<div class="ol-checkbox ${line.checked ? 'checked' : ''}" data-act="check">✓</div>` 
+        : `<button class="ol-bullet-btn" title="เปลี่ยนเป็น Checklist" data-act="toggleTask">•</button>`;
+
+      row.innerHTML = `
+        ${guidesHtml}
+        <div class="ol-controls">
+          <div class="ol-drag" title="ลากเพื่อสลับที่">⋮⋮</div>
+          <button class="${arrowClass}" data-act="collapse">▼</button>
+          ${bulletHtml}
+        </div>
+        <div class="ol-text" contenteditable="true" data-checked="${line.checked}" data-placeholder="พิมพ์เนื้อหา...">${line.text}</div>
+        <div class="ol-btns">
+          <button data-act="task" title="เปิด/ปิด Checklist">☑</button>
+          <button data-act="out" title="เลื่อนซ้าย (Shift+Tab)">←</button>
+          <button data-act="in" title="เลื่อนขวา (Tab)">→</button>
+          <button data-act="del" title="ลบทิ้ง">✕</button>
+        </div>
+      `;
+      
+      // --- ระบบ Drag & Drop ---
+      const dragHandle = row.querySelector('.ol-drag');
+      dragHandle.addEventListener('mousedown', () => row.setAttribute('draggable', 'true'));
+      row.addEventListener('dragstart', e => { draggedIdx = idx; setTimeout(() => row.classList.add('dragging'), 0); });
+      row.addEventListener('dragend', e => { row.classList.remove('dragging'); row.removeAttribute('draggable'); draggedIdx = null; draw(); });
+      row.addEventListener('dragover', e => { e.preventDefault(); row.style.boxShadow = "0 -2px 0 var(--amber)"; });
+      row.addEventListener('dragleave', e => { row.style.boxShadow = ""; });
+      row.addEventListener('drop', e => {
+        e.preventDefault(); row.style.boxShadow = "";
+        if(draggedIdx === null || draggedIdx === idx) return;
+        
+        let dragCount = 1; let dragLevel = item.content.items[draggedIdx].level;
+        for(let i = draggedIdx + 1; i < item.content.items.length; i++) {
+           if(item.content.items[i].level > dragLevel) dragCount++; else break;
+        }
+        
+        const movedItems = item.content.items.splice(draggedIdx, dragCount);
+        let newIdx = draggedIdx < idx ? idx - dragCount + 1 : idx;
+        
+        const targetLevel = item.content.items[newIdx] ? item.content.items[newIdx].level : 0;
+        const levelDiff = targetLevel - movedItems[0].level;
+        movedItems.forEach(mi => { mi.level = Math.max(0, mi.level + levelDiff); });
+
+        item.content.items.splice(newIdx, 0, ...movedItems);
+        item.updatedAt = now(); draw();
+      });
+
+      // --- การพิมพ์ และ คีย์ลัด ---
+      const inp = row.querySelector('.ol-text');
+      let t;
+      inp.addEventListener('input', () => {
+         clearTimeout(t); t = setTimeout(() => { line.text = inp.innerHTML; item.updatedAt=now(); }, 300);
+      });
+
+      inp.addEventListener('keydown', e => {
+        if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); insertAfter(idx, line.level); }
+        if(e.key === 'Tab') {
+           e.preventDefault();
+           if (e.shiftKey) { line.level = Math.max(0, line.level - 1); }
+           else { line.level = Math.min(6, line.level + 1); }
+           item.updatedAt=now(); draw(); focusRow(idx);
+        }
+        if(e.key === 'Backspace' && inp.innerText.trim() === '') {
+           e.preventDefault();
+           if(item.content.items.length > 1) {
+               item.content.items.splice(idx, 1); item.updatedAt=now(); draw(); focusRow(Math.max(0, idx - 1));
+           }
+        }
+      });
+
+      // --- การทำงานของปุ่ม ---
+      row.querySelector('[data-act="collapse"]').onclick = () => { line.collapsed = !line.collapsed; item.updatedAt=now(); draw(); };
+      const checkBtn = row.querySelector('[data-act="check"]');
+      if(checkBtn) checkBtn.onclick = () => { line.checked = !line.checked; item.updatedAt=now(); draw(); };
+      const toggleTaskBtn = row.querySelector('[data-act="toggleTask"]');
+      if(toggleTaskBtn) toggleTaskBtn.onclick = () => { line.isTask = true; item.updatedAt=now(); draw(); };
+      
+      row.querySelector('[data-act="task"]').onclick = () => { line.isTask = !line.isTask; item.updatedAt=now(); draw(); };
+      row.querySelector('[data-act="out"]').onclick = () => { line.level = Math.max(0, line.level - 1); item.updatedAt=now(); draw(); focusRow(idx); };
+      row.querySelector('[data-act="in"]').onclick = () => { line.level = Math.min(6, line.level + 1); item.updatedAt=now(); draw(); focusRow(idx); };
+      row.querySelector('[data-act="del"]').onclick = () => { if(item.content.items.length > 1) { item.content.items.splice(idx, 1); item.updatedAt=now(); draw(); } };
+
+      rows.appendChild(row);
+    });
+  }
+
+  function insertAfter(idx, level){
+    item.content.items.splice(idx+1,0,{id:uid(), text:'', level: level, collapsed:false, isTask:false, checked:false});
+    item.updatedAt=now(); draw(); focusRow(idx+1);
+  }
+
+  function focusRow(idx){ 
+    setTimeout(()=>{ const el = rows.querySelector(`.ol-row[data-idx="${idx}"] .ol-text`); if(el) el.focus(); }, 50);
+  }
+
+  document.getElementById('olAdd').onclick = ()=> insertAfter(item.content.items.length-1, 0);
+  
+  // ลบ Task ที่เสร็จแล้ว
+  document.getElementById('olClearChecked').onclick = () => {
+    const beforeCount = item.content.items.length;
+    item.content.items = item.content.items.filter(i => !i.checked);
+    if(item.content.items.length === 0) item.content.items.push({id:uid(), text:'', level:0}); // กันไม่ให้โล่ง
+    if(beforeCount > item.content.items.length) { item.updatedAt=now(); draw(); toast("ลบ Task ที่เสร็จแล้วเรียบร้อย! 🧹"); }
+    else { toast("ไม่มี Task ที่ขีดฆ่าให้ลบครับ"); }
+  };
+
+  draw();
+
+  // --- แก้บั๊ก Floating Menu (ทำงาน 100%) ---
+  const fm = document.getElementById('floatingMenuOutline');
+  document.addEventListener('selectionchange', () => {
+    const activeEl = document.activeElement;
+    if(!activeEl || !activeEl.classList.contains('ol-text')) return;
+    let sel = window.getSelection();
+    if(sel.toString().length > 0 && sel.rangeCount > 0) {
+      let rect = sel.getRangeAt(0).getBoundingClientRect();
+      fm.classList.add('show');
+      fm.style.top = (rect.top - 45) + 'px';
+      fm.style.left = (rect.left + (rect.width/2) - 80) + 'px';
+    } else { fm.classList.remove('show'); }
+  });
+  
+  fm.querySelectorAll('[data-fcmd]').forEach(b => {
+    b.onclick = (e) => {
+      e.preventDefault();
+      document.execCommand(b.dataset.fcmd, false, b.value || null);
+      if(document.activeElement) document.activeElement.focus();
+    };
+  });
+}
+/* ================= EXPORT / IMPORT ================= */
+document.getElementById('exportBtn').onclick = ()=>{
+  const clean = JSON.parse(JSON.stringify(data));
+  const blob = new Blob([JSON.stringify(clean,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'sarupsi-backup-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  toast('Backup downloaded');
+};
+document.getElementById('importInput').addEventListener('change', e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const parsed = JSON.parse(reader.result);
+      if(!parsed.years) throw new Error('bad format');
+      data = parsed;
+      sel = {yearId:null, subjectId:null, unitId:null, type:'note'};
+      renderAll();
+      toast('Backup imported');
+    }catch(err){ toast('Could not read that file'); }
+  };
+  reader.readAsText(file);
+  e.target.value='';
+});
+
+/* ================= INIT & AUTO-RESUME ================= */
+// 1. โหลดข้อมูล (Data) และหน้าล่าสุด (Auto-Resume) จากเบราว์เซอร์
+const savedData = localStorage.getItem('sarupsi_data');
+if(savedData) { try { data = JSON.parse(savedData); } catch(e) {} }
+
+const savedSel = localStorage.getItem('sarupsi_sel');
+if(savedSel) {
+  try { 
+    let parsedSel = JSON.parse(savedSel);
+    // เช็คก่อนว่า Unit ที่เคยเปิดไว้ยังไม่ถูกลบไป
+    if(getUnit(parsedSel.yearId, parsedSel.subjectId, parsedSel.unitId)) { sel = parsedSel; }
+  } catch(e) {}
+}
+
+function renderAll(){ 
+  localStorage.setItem('sarupsi_sel', JSON.stringify(sel)); // จำหน้าปัจจุบันไว้เสมอ
+  renderSidebar(); renderContent(); 
+}
+
+// 2. Sidebar Toggle Logic (Full Screen Mode)
+const menuBtn = document.getElementById('menuToggle');
+menuBtn.style.display = 'inline-flex'; 
+menuBtn.onclick = () => {
+  if (window.innerWidth <= 760) { document.getElementById('spine').classList.toggle('open'); }
+  else { document.getElementById('app').classList.toggle('sidebar-collapsed'); }
+};
+
+// 3. 🍅 Pomodoro Timer & Focus Mode
+let pomoInterval = null;
+let pomoTime = 25 * 60; // 25 นาที
+let isPomoRunning = false;
+const pomoBtn = document.getElementById('pomoBtn');
+
+pomoBtn.onclick = () => {
+  if (isPomoRunning) {
+    // กดยกเลิก
+    clearInterval(pomoInterval);
+    isPomoRunning = false;
+    pomoTime = 25 * 60;
+    pomoBtn.innerHTML = `🍅 25:00`;
+    pomoBtn.style.background = '';
+    pomoBtn.style.color = '';
+    document.getElementById('app').classList.remove('sidebar-collapsed'); // ออกจากโหมดโฟกัส
+    toast("ยกเลิก Pomodoro แล้ว");
+  } else {
+    // กดเริ่มจับเวลา
+    isPomoRunning = true;
+    pomoBtn.style.background = 'var(--coral)'; // เปลี่ยนเป็นสีแดง
+    pomoBtn.style.color = 'white';
+    
+    // พับเก็บ Sidebar อัตโนมัติ (Focus Mode)
+    if(window.innerWidth > 760) document.getElementById('app').classList.add('sidebar-collapsed');
+    toast("🎯 เริ่มโหมดโฟกัส! ปิดสิ่งรบกวน 25 นาที");
+
+    pomoInterval = setInterval(() => {
+      pomoTime--;
+      let m = Math.floor(pomoTime / 60).toString().padStart(2, '0');
+      let s = (pomoTime % 60).toString().padStart(2, '0');
+      pomoBtn.innerHTML = `⏳ ${m}:${s}`;
+      
+      if (pomoTime <= 0) {
+        clearInterval(pomoInterval);
+        isPomoRunning = false;
+        pomoTime = 25 * 60;
+        pomoBtn.innerHTML = `🍅 พัก 5 นาที!`;
+        pomoBtn.style.background = 'var(--sage)';
+        document.getElementById('app').classList.remove('sidebar-collapsed');
+        // เปิดเสียงเตือนตอนหมดเวลา
+        new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(()=>{}); 
+        alert("หมดเวลา 25 นาที! พักสายตา 5 นาทีนะครับ 🎉");
+      }
+    }, 1000);
+  }
+};
+
+// 4. 🌙 Dark Mode Toggle (Physical Button & Shortcut)
+const themeBtn = document.getElementById('themeBtn');
+const toggleTheme = () => {
+  document.body.classList.toggle('dark-mode');
+  const isDark = document.body.classList.contains('dark-mode');
+  localStorage.setItem('sarupsi_dark', isDark);
+  themeBtn.innerHTML = isDark ? '☀️' : '🌙';
+};
+
+// โหลดโหมดเดิมตอนเปิดเว็บ
+if(localStorage.getItem('sarupsi_dark') === 'true') {
+  document.body.classList.add('dark-mode');
+  themeBtn.innerHTML = '☀️';
+}
+themeBtn.onclick = toggleTheme;
+// รองรับ Shortcut เดิม
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'd') { e.preventDefault(); toggleTheme(); }
+});
+
+// 5. Auto Backup ทุก 3 นาที (เซฟข้อมูลทุกอย่าง)
+setInterval(() => {
+  localStorage.setItem('sarupsi_data', JSON.stringify(data));
+  localStorage.setItem('sarupsi_sel', JSON.stringify(sel));
+  toast('บันทึกข้อมูลอัตโนมัติ 💾');
+}, 180000); // 180000ms = 3 นาที
+
+// สั่งเริ่มทำงาน
+/* =========================================================
+   🔒 AUTHENTICATION LOGIC
+========================================================= */
+let allUsers = JSON.parse(localStorage.getItem('sarupsi_users')) || [];
+let savedLogins = JSON.parse(localStorage.getItem('sarupsi_saved_logins')) || [];
+let activeUser = JSON.parse(localStorage.getItem('sarupsi_active_user')) || null;
+
+// ซ่อน UI ของแอปหลักไว้ก่อน
+document.getElementById('app').style.display = 'none';
+
+function initAuth() {
+  if (activeUser) {
+    // ถ้าเคยล็อกอินค้างไว้ ให้เข้าแอปเลย
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('app').style.display = window.innerWidth <= 760 ? 'grid' : 'grid'; // คืนค่า Grid
+    
+    // อัปเดตข้อมูลโปรไฟล์ใน Sidebar
+    document.getElementById('appUserName').innerText = activeUser.name;
+    document.getElementById('appUserId').innerText = "ID: " + activeUser.id;
+    document.getElementById('appUserAvatar').src = activeUser.avatar;
+    
+    renderAll();
+  } else {
+    // ถ้ายังไม่ล็อกอิน โชว์หน้า Auth
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    
+    if (savedLogins.length > 0) {
+      switchAuthView('profiles');
+      renderSavedProfiles();
+    } else {
+      switchAuthView('login');
+      showAuthMsg('แนะนำ: ลงทะเบียนผู้ใช้ใหม่ก่อนเข้าใช้งานครับ', 'success');
+    }
+  }
+}
+
+function showAuthMsg(msg, type) {
+  const msgBox = document.getElementById('authMsg');
+  msgBox.className = `auth-msg ${type}`;
+  msgBox.innerText = msg;
+}
+
+function switchAuthView(view) {
+  document.getElementById('viewProfiles').style.display = 'none';
+  document.getElementById('viewLogin').style.display = 'none';
+  document.getElementById('viewRegister').style.display = 'none';
+  document.getElementById('authMsg').style.display = 'none'; // ล้างข้อความเตือน
+
+  if (view === 'profiles') {
+    document.getElementById('viewProfiles').style.display = 'block';
+    document.getElementById('authSubtitle').innerText = 'ยินดีต้อนรับกลับมา! เลือกบัญชีของคุณ';
+  } else if (view === 'login') {
+    document.getElementById('viewLogin').style.display = 'block';
+    document.getElementById('authSubtitle').innerText = 'เข้าสู่ระบบเพื่อจดสรุปต่อ';
+    document.getElementById('loginId').value = '';
+    document.getElementById('loginPwd').value = '';
+  } else if (view === 'register') {
+    document.getElementById('viewRegister').style.display = 'block';
+    document.getElementById('authSubtitle').innerText = 'ลงทะเบียนเพื่อเริ่มต้นใช้งาน SARUPSI';
+  }
+}
+
+// ระบบ เปิด/ปิด ตาดูรหัสผ่าน
+function togglePwd(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  if (inp.type === 'password') {
+    inp.type = 'text'; btn.innerText = '👁️‍🗨️';
+  } else {
+    inp.type = 'password'; btn.innerText = '👁️';
+  }
+}
+// ==========================================
+// 🎨 AVATAR STUDIO (ระบบแต่งรูปโปรไฟล์)
+// ==========================================
+function openAvatarStudio() {
+  if (!activeUser) return;
+  
+  // ดึงข้อมูลรูปปัจจุบันมาเป็นค่าเริ่มต้น
+  let currentStyle = 'micah';
+  let currentSeed = activeUser.name;
+  let currentBg = 'fdfbf7';
+  
+  try {
+    const url = new URL(activeUser.avatar);
+    const pathParts = url.pathname.split('/');
+    currentStyle = pathParts[pathParts.length - 2] || 'micah';
+    currentSeed = url.searchParams.get('seed') || activeUser.name;
+    currentBg = url.searchParams.get('backgroundColor') || 'fdfbf7';
+  } catch(e) {}
+
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="modal-overlay" id="ovlStudio" style="z-index: 10000; background: rgba(15,23,42,0.7); backdrop-filter: blur(4px);">
+      <div class="modal-box" style="width: 380px; text-align: center; border-radius: 24px; padding: 32px 24px;">
+        <h3 style="margin-bottom: 24px; font-size: 20px; color: var(--ink-900);">🎨 Avatar Studio</h3>
+        
+        <!-- Live Preview -->
+        <div id="avPreviewWrap" style="width: 140px; height: 140px; margin: 0 auto 24px; border-radius: 50%; box-shadow: 0 10px 30px rgba(0,0,0,0.15); overflow: hidden; border: 4px solid #fff; background: #${currentBg}; transition: background 0.3s;">
+          <img id="avPreview" src="${activeUser.avatar}" style="width:100%; height:100%; object-fit:cover;">
+        </div>
+        
+        <!-- แผงควบคุม (Controls) -->
+        <div style="text-align: left; display: flex; flex-direction: column; gap: 16px;">
+          
+          <div>
+            <label style="font-size: 13px; font-weight: 600; color: var(--text-soft); display:block; margin-bottom:6px;">1. เลือกลายเส้น (Art Style)</label>
+            <select id="avStyle" style="width: 100%; padding: 12px; border-radius: 12px; border: 2px solid var(--paper-line); font-family: 'Inter', 'Kanit', sans-serif; font-size: 14px; outline: none; cursor:pointer; background:#fff;">
+              <option value="micah" ${currentStyle==='micah'?'selected':''}>🧑 Micah (คนมินิมอล)</option>
+              <option value="avataaars" ${currentStyle==='avataaars'?'selected':''}>👤 Avataaars (คนสไตล์แอปเปิล)</option>
+              <option value="lorelei" ${currentStyle==='lorelei'?'selected':''}>🎀 Lorelei (การ์ตูนสีน้ำ)</option>
+              <option value="fun-emoji" ${currentStyle==='fun-emoji'?'selected':''}>😍 Fun Emoji (อิโมจิน่ารักๆ)</option>
+              <option value="bottts" ${currentStyle==='bottts'?'selected':''}>🤖 Bottts (หุ่นยนต์สุดเท่)</option>
+              <option value="adventurer" ${currentStyle==='adventurer'?'selected':''}>⚔️ Adventurer (สาย RPG)</option>
+            </select>
+          </div>
+          
+          <div>
+            <label style="font-size: 13px; font-weight: 600; color: var(--text-soft); display:block; margin-bottom:6px;">2. พิมพ์มั่วๆ เพื่อสุ่มหน้าตา (Magic Seed)</label>
+            <div style="display:flex; gap:8px;">
+              <input type="text" id="avSeed" value="${escapeHtml(currentSeed)}" style="flex:1; padding: 12px; border-radius: 12px; border: 2px solid var(--paper-line); font-family: inherit; font-size: 14px; outline: none;" placeholder="พิมพ์อะไรก็ได้...">
+              <button id="avDice" style="padding: 0 16px; border-radius: 12px; border: none; background: var(--amber); color:#fff; cursor: pointer; font-size:20px; transition:0.2s;" title="ทอยเต๋าสุ่มหน้า">🎲</button>
+            </div>
+          </div>
+          
+          <div>
+            <label style="font-size: 13px; font-weight: 600; color: var(--text-soft); display:block; margin-bottom:6px;">3. สีพื้นหลัง (Background Color)</label>
+            <input type="color" id="avBg" value="#${currentBg === 'transparent' ? 'ffffff' : currentBg}" style="width: 100%; height: 44px; border-radius: 12px; border: 2px solid var(--paper-line); cursor: pointer; padding: 2px; background:#fff;">
+          </div>
+          
+        </div>
+        
+        <div style="display:flex; gap:10px; margin-top: 32px;">
+          <button style="flex:1; background: var(--paper); border: none; padding: 14px; border-radius: 12px; font-weight: 600; color: var(--text-soft); cursor: pointer;" onclick="closeModal()">ยกเลิก</button>
+          <button style="flex:2; background: linear-gradient(135deg, #4f46e5, #818cf8); border: none; padding: 14px; border-radius: 12px; font-weight: 600; color: #fff; cursor: pointer; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);" id="saveAvatarBtn">✨ บันทึกโปรไฟล์</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const styleSel = document.getElementById('avStyle');
+  const seedInp = document.getElementById('avSeed');
+  const bgInp = document.getElementById('avBg');
+  const preview = document.getElementById('avPreview');
+  const previewWrap = document.getElementById('avPreviewWrap');
+  
+  // ฟังก์ชันอัปเดตหน้าตาแบบ Real-time
+  const updatePreview = () => {
+    const style = styleSel.value;
+    const seed = encodeURIComponent(seedInp.value || 'smile');
+    const bg = bgInp.value.replace('#', '');
+    preview.src = `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}&backgroundColor=${bg}`;
+    previewWrap.style.backgroundColor = '#' + bg;
+  };
+  
+  styleSel.addEventListener('change', updatePreview);
+  seedInp.addEventListener('input', updatePreview);
+  bgInp.addEventListener('input', updatePreview);
+  
+  // ปุ่มทอยเต๋า สุ่ม Seed ตัวอักษรมั่วๆ
+  document.getElementById('avDice').onclick = () => {
+    seedInp.value = uid(); // ใช้ฟังก์ชันสุ่ม uid ของเรา
+    updatePreview();
+  };
+  
+  // กดปิดเมื่อคลิกพื้นหลังดำ
+  document.getElementById('ovlStudio').addEventListener('click', e => { if(e.target.id === 'ovlStudio') closeModal(); });
+  
+  // กดบันทึก (Save)
+  document.getElementById('saveAvatarBtn').onclick = () => {
+     activeUser.avatar = preview.src;
+     localStorage.setItem('sarupsi_active_user', JSON.stringify(activeUser));
+     
+     // อัปเดตในฐานข้อมูลผู้ใช้ทั้งหมด
+     const uIndex = allUsers.findIndex(u => u.id === activeUser.id);
+     if(uIndex !== -1) allUsers[uIndex].avatar = activeUser.avatar;
+     localStorage.setItem('sarupsi_users', JSON.stringify(allUsers));
+     
+     // อัปเดตใน Saved Profiles ของหน้า Login
+     const sIndex = savedLogins.findIndex(u => u.id === activeUser.id);
+     if(sIndex !== -1) savedLogins[sIndex].avatar = activeUser.avatar;
+     localStorage.setItem('sarupsi_saved_logins', JSON.stringify(savedLogins));
+     
+     // อัปเดตหน้าจอปัจจุบัน
+     document.getElementById('appUserAvatar').src = activeUser.avatar;
+     
+     closeModal();
+     toast('✨ อัปเดตโปรไฟล์น่ารักๆ เรียบร้อย!');
+  };
+}
+// ลงทะเบียน (อัปเกรด UX: สมัครเสร็จเข้าแอปเลย + ดัก ID ซ้ำ)
+function doRegister() {
+  const name = document.getElementById('regName').value.trim();
+  const id = document.getElementById('regId').value.trim();
+  const pwd = document.getElementById('regPwd').value;
+  const pwdConfirm = document.getElementById('regPwdConfirm').value;
+
+  if (!name || !id || !pwd) return showAuthMsg('กรุณากรอกข้อมูลให้ครบถ้วน ⚠️', 'error');
+  if (pwd !== pwdConfirm) return showAuthMsg('รหัสผ่านไม่ตรงกัน กรุณาเช็กอีกครั้ง ⚠️', 'error');
+  
+  // UX Logic: ถ้าพิมพ์ ID ซ้ำกับที่มีอยู่ ให้เด้งกลับไปหน้าล็อกอินพร้อมกรอก ID ให้เลย
+  if (allUsers.find(u => u.id === id)) {
+    showAuthMsg('รหัสนี้ลงทะเบียนไปแล้ว! กำลังพากลับไปหน้าเข้าสู่ระบบ...', 'error');
+    setTimeout(() => {
+      switchAuthView('login');
+      document.getElementById('loginId').value = id;
+      document.getElementById('loginPwd').focus(); // เคอร์เซอร์รอที่ช่องรหัสผ่าน
+    }, 1800);
+    return;
+  }
+
+  // สร้างอวาตาร์น่ารักๆ อัตโนมัติตามชื่อ
+  const avatar = `https://api.dicebear.com/7.x/micah/svg?seed=${encodeURIComponent(name)}&backgroundColor=fdfbf7`;
+
+  const newUser = { name, id, pwd, avatar };
+  allUsers.push(newUser);
+  localStorage.setItem('sarupsi_users', JSON.stringify(allUsers));
+  
+  // UX Logic: สมัครเสร็จปุ๊บ เข้าแอปให้ทันที ไม่ต้องกดซ้ำ!
+  showAuthMsg('🎉 ลงทะเบียนสำเร็จ! กำลังพาท่านเข้าสู่ระบบ...', 'success');
+  setTimeout(() => loginSuccess(newUser), 1200);
+}
+
+// ล็อกอิน (อัปเกรด UX: ถ้าใส่รหัสผิด เคลียร์ช่องรหัสให้พิมพ์ใหม่)
+function doLogin() {
+  const id = document.getElementById('loginId').value.trim();
+  const pwd = document.getElementById('loginPwd').value;
+
+  if (!id || !pwd) return showAuthMsg('กรุณากรอก ID และรหัสผ่าน ⚠️', 'error');
+
+  const user = allUsers.find(u => u.id === id && u.pwd === pwd);
+  if (!user) {
+    document.getElementById('loginPwd').value = ''; // เคลียร์เฉพาะรหัสผ่านให้พิมพ์ใหม่
+    document.getElementById('loginPwd').focus();
+    return showAuthMsg('ID หรือ รหัสผ่านไม่ถูกต้อง ❌', 'error');
+  }
+
+  loginSuccess(user);
+}
+
+// กดจากรูปโปรไฟล์
+function loginWithProfile(id) {
+  // เวลาคลิกรูป จะส่งไปหน้าล็อกอิน และกรอก ID ให้เลย ให้กรอกแค่รหัสผ่าน (เพื่อความปลอดภัย)
+  switchAuthView('login');
+  document.getElementById('loginId').value = id;
+  document.getElementById('loginPwd').focus();
+  showAuthMsg('เพื่อความปลอดภัย กรุณากรอกรหัสผ่านครับ 🔐', 'success');
+}
+
+function loginSuccess(user) {
+  activeUser = user;
+  localStorage.setItem('sarupsi_active_user', JSON.stringify(activeUser));
+
+  // เซฟลงบัญชีที่เคยล็อกอิน (Saved Logins)
+  if (!savedLogins.find(u => u.id === user.id)) {
+    savedLogins.push({ id: user.id, name: user.name, avatar: user.avatar });
+    localStorage.setItem('sarupsi_saved_logins', JSON.stringify(savedLogins));
+  }
+
+  initAuth(); // รีเฟรชหน้าจอเข้าแอป
+}
+
+function renderSavedProfiles() {
+  const wrap = document.getElementById('profilesList');
+  wrap.innerHTML = '';
+  savedLogins.forEach(user => {
+    wrap.innerHTML += `
+      <div class="profile-card" onclick="loginWithProfile('${user.id}')">
+        <button class="profile-remove" onclick="removeProfile(event, '${user.id}')" title="ลบบัญชีนี้ออก">✕</button>
+        <div class="profile-avatar"><img src="${user.avatar}"></div>
+        <div class="profile-name">${escapeHtml(user.name)}</div>
+      </div>
+    `;
+  });
+}
+
+function removeProfile(event, id) {
+  event.stopPropagation(); // กันไม่ให้กดทะลุไปล็อกอิน
+  savedLogins = savedLogins.filter(u => u.id !== id);
+  localStorage.setItem('sarupsi_saved_logins', JSON.stringify(savedLogins));
+  if (savedLogins.length === 0) switchAuthView('login');
+  else renderSavedProfiles();
+}
+
+// ล็อกเอาท์
+function doLogout() {
+  activeUser = null;
+  localStorage.removeItem('sarupsi_active_user');
+  initAuth(); // เด้งกลับหน้าล็อกอิน
+}
+
+// แทนที่ renderAll() ด้านล่างสุดด้วยคำสั่งรันระบบ Auth
+// ลบ renderAll() อันเก่าทิ้งได้เลย แล้วใช้ 1 บรรทัดนี้แทน
+initAuth();
+</script>
+</body>
+</html> 

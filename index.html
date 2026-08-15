@@ -3338,15 +3338,43 @@ function openAvatarStudio() {
 }
 
 // ==========================================
-// 🔁 AUTO BACKUP CLOUD SYNC (ซิงค์ทุกๆ 5 วินาที)
+// ⚡ REAL-TIME LIVE CLOUD SYNC (ซิงค์ไวทันใจ + Real-time)
 // ==========================================
-setInterval(() => {
-  if (auth.currentUser && data && data.years) {
-    db.ref('users/' + auth.currentUser.uid + '/data').set(data);
-    localStorage.setItem('sarupsi_sel', JSON.stringify(sel)); // จำหน้าสุดท้ายไว้ในเครื่อง
-  }
-}, 5000); 
+let saveTimeout = null;
 
+// ฟังก์ชันสั่งเซฟขึ้น Cloud ทันที (มีความหน่วง 0.3 วิ ป้องกันข้อมูลชนกันตอนพิมพ์รัวๆ)
+function triggerCloudSync() {
+  if (!auth.currentUser || !data || !data.years) return;
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    db.ref('users/' + auth.currentUser.uid + '/data').set(data);
+    localStorage.setItem('sarupsi_sel', JSON.stringify(sel));
+  }, 300); // 300 มิลลิวินาที = เร็วเกือบจะ Real-time โดยไม่หน่วงเครื่อง
+}
+
+// ผูกตัวดักฟัง (Listener) ข้อมูลจากเครื่องอื่นแบบสดๆ
+function setupRealtimeSync(uid) {
+  db.ref('users/' + uid + '/data').on('value', (snapshot) => {
+    const cloudData = snapshot.val();
+    if (cloudData && cloudData.years) {
+      const localStr = JSON.stringify(data);
+      const cloudStr = JSON.stringify(cloudData);
+      
+      // ถ้าข้อมูลบน Cloud ไม่ตรงกับเครื่องนี้ (แปลว่ามีเครื่องอื่นแก้) ให้ดึงข้อมูลใหม่มาแสดง
+      if (localStr !== cloudStr) {
+        data = cloudData;
+        // ถือว่าผู้ใช้อาจจะไม่ได้กำลังพิมพ์อยู่ ถึงจะรีเฟรชหน้าจออัตโนมัติป้องกันเคอร์เซอร์หลุด
+        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && !document.activeElement.isContentEditable) {
+          renderSidebar();
+          renderContent();
+        }
+      }
+    }
+  });
+}
+
+// 💡 แทรกคำสั่งเปิดใช้งาน Real-time Listener เข้าไปตอนล็อกอินสำเร็จ
+// ให้เลื่อนไปดูฟังก์ชัน onAuthStateChanged ด้านบน แล้วเรียกใช้ setupRealtimeSync(user.uid);
 // หมายเหตุ: ไม่ต้องเรียกใช้ renderAll() ล่างสุดแล้ว เพราะระบบ onAuthStateChanged (ตัวรับสัญญาณข้อ 1) จะคอยจัดการเรียกให้เราเองครับ
 </script>
 </body>

@@ -1340,8 +1340,8 @@
 <div id="app">
 
   <aside class="spine" id="spine">
-<div class="brand" style="cursor:pointer;" onclick="sel.yearId=null; sel.subjectId=null; sel.unitId=null; renderAll();" title="กลับหน้าหลัก">
-      <div class="mark"><span style="font-size:22px; margin-right:4px;">✨</span>SARUP<span>SI</span></div>
+<div class="brand" style="cursor:pointer;" onclick="checkUnsaved(()=>{ sel.yearId=null; sel.subjectId=null; sel.unitId=null; renderAll(); })" title="กลับหน้าหลัก">
+  <div class="mark"><span style="font-size:22px; margin-right:4px;">✨</span>SARUP<span>SI</span></div>
       <div class="by">by SUKI</div>
     </div>
     <div class="years" id="yearsList"></div>
@@ -1375,9 +1375,6 @@
         <div class="eyebrow" id="crumbEyebrow">SARUPSI</div>
         <h1 id="crumbTitle">Welcome</h1>
       </div>
-      
-      <!-- เพิ่มปุ่มบันทึกตรงนี้! -->
-      <button class="topbtn" id="saveCloudBtn" style="background: var(--amber); color: #241605; box-shadow: 0 3px 0 var(--amber-deep); border: none;">💾 บันทึก (Save)</button>
       
       <button class="topbtn" id="pomoBtn" title="Pomodoro Focus Mode" style="font-family:'JetBrains Mono',monospace;">🍅 25:00</button>
       <button class="topbtn" id="themeBtn" title="Toggle Dark Mode">🌙</button>
@@ -1423,7 +1420,15 @@ const db = firebase.database();
 let data = { years: [] };
 let sel = { yearId: null, subjectId: null, unitId: null, type: 'note' };
 let mmState = null; // active mind-map drag state
+let hasUnsavedChanges = false; // ตัวแปรคอยจับว่ามีเนื้อหาที่ยังไม่เซฟไหม
 
+// 🌟 เรดาร์ดักจับการพิมพ์ทุกอย่างในจอ! ถ้าแอบพิมพ์อะไรแม้แต่ตัวเดียว ระบบจะรู้ทันที
+document.addEventListener('input', (e) => {
+    // เช็กว่าพิมพ์ในโซนเนื้อหา (Editor) ใช่ไหม (ยกเว้นช่อง Search)
+    if (e.target.closest('#content')) {
+        hasUnsavedChanges = true;
+    }
+});  
 const TYPES = [
   {key:'note', label:'Note', icon:'📝', color:'#e7dbc2', text:'#7a5b17'},
   {key:'cornell', label:'Cornell', icon:'📑', color:'#d4e4ed', text:'#2c5282'},
@@ -1526,6 +1531,97 @@ function openModal({title, msg, fields=[], danger=false, submitLabel='Save', onS
 }
 function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
 
+// ---------------- วางโค้ดใหม่ตรงนี้เลยครับ ----------------
+
+// 🛠️ 0. ฟังก์ชันซ่อมแซมข้อมูลจาก Firebase (ดักบั๊ก Array กลายเป็น Object)
+function sanitizeData(d) {
+  if (!d) return { years: [] };
+  if (!d.years) d.years = [];
+  if (!Array.isArray(d.years)) d.years = Object.values(d.years);
+  d.years.forEach(y => {
+    if (!y.subjects) y.subjects = [];
+    if (!Array.isArray(y.subjects)) y.subjects = Object.values(y.subjects);
+    y.subjects.forEach(s => {
+      if (!s.units) s.units = [];
+      if (!Array.isArray(s.units)) s.units = Object.values(s.units);
+      s.units.forEach(u => {
+        if (!u.summaries) u.summaries = [];
+        if (!Array.isArray(u.summaries)) u.summaries = Object.values(u.summaries);
+      });
+    });
+  });
+  return d;
+}
+
+// 🧹 1. ฟังก์ชันกรองข้อมูล (ตัดสถานะเปิด/ปิด ออก เพื่อเช็กแค่ "เนื้อหา" ที่เปลี่ยนไปจริงๆ)
+function getCleanDataStr(d) {
+  if(!d) return "";
+  const clean = JSON.parse(JSON.stringify(d));
+  if(clean.years) {
+    clean.years.forEach(y => {
+      delete y.open;
+      if(y.subjects) y.subjects.forEach(s => {
+        delete s.open;
+        if(s.units) s.units.forEach(u => delete u._openItem);
+      });
+    });
+  }
+  return JSON.stringify(clean);
+}
+// ฟังก์ชันเช็กและแสดง Pop-up แจ้งเตือนก่อนเปลี่ยนหน้า (ฉบับแสดงชื่อไฟล์)
+function checkUnsaved(proceedCallback) {
+  if (!hasUnsavedChanges) {
+    proceedCallback(); // ถ้าไม่ได้แก้อะไรเลย ให้เปลี่ยนหน้าได้ปกติ
+    return;
+  }
+  
+  // 🌟 ดึงชื่อไฟล์ที่กำลังเปิดอยู่ปัจจุบันมาแสดง
+  let fileName = "ไฟล์ปัจจุบัน"; // ค่าเริ่มต้นเผื่อหาชื่อไม่เจอ
+  
+  // พยายามดึงจากช่องพิมพ์ชื่อไฟล์ตรงๆ (ได้ชื่ออัปเดตล่าสุดชัวร์ๆ)
+  const titleInput = document.getElementById('titleInput');
+  if (titleInput && titleInput.value.trim() !== '') {
+      fileName = titleInput.value.trim();
+  } else {
+      // เผื่อช่อง input ไม่มี ดึงจากตัวแปรระบบแทน
+      const unit = currentUnit();
+      if (unit && unit._openItem) {
+          const item = unit.summaries.find(s => s.id === unit._openItem);
+          if (item && item.title) fileName = item.title;
+      }
+  }
+
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="modal-overlay" id="ovlUnsaved" style="z-index: 10000; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px);">
+      <div class="modal-box" style="width: 360px; text-align: center; border-radius: 20px; padding: 32px 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); background: #fff;">
+        <div style="font-size: 56px; margin-bottom: 12px; line-height: 1;">⚠️</div>
+        <h3 style="margin-bottom: 12px; font-size: 20px; color: #1e293b; font-weight: 700; font-family: 'Inter', 'Kanit', sans-serif;">ยังไม่ได้บันทึกข้อมูล!</h3>
+        
+        <!-- 🌟 โชว์ชื่อไฟล์ตรงนี้ พร้อมเน้นสีให้ชัดเจน -->
+        <p style="font-size: 14.5px; color: #64748b; line-height: 1.6; margin-bottom: 24px; padding: 0 10px; font-family: 'Inter', 'Kanit', sans-serif;">
+          คุณแก้ไข <strong style="color: var(--coral);">"${escapeHtml(fileName)}"</strong> ค้างไว้<br>ต้องการบันทึกก่อนเปลี่ยนหน้าหรือไม่?
+        </p>
+
+        <div style="display:flex; gap:12px; align-items: center; justify-content: space-between; font-family: 'Inter', 'Kanit', sans-serif;">
+          <button id="usCancel" style="flex:1; background: transparent; border: none; font-size: 14px; font-weight: 600; color: #94a3b8; cursor: pointer;">ยกเลิก</button>
+          <button id="usDiscard" style="flex:1.2; background: #c1584c; border: none; padding: 12px 0; border-radius: 10px; font-size: 14px; font-weight: 600; color: #fff; cursor: pointer;">ไม่บันทึก (ทิ้ง)</button>
+          <button id="usSave" style="flex:1.2; background: #6366f1; border: none; padding: 12px 0; border-radius: 10px; font-size: 14px; font-weight: 600; color: #fff; cursor: pointer; box-shadow: 0 4px 12px rgba(99,102,241,0.3);">บันทึก (Save)</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('usCancel').onclick = () => closeModal();
+document.getElementById('usDiscard').onclick = () => { 
+      hasUnsavedChanges = false; 
+      data = sanitizeData(JSON.parse(lastSavedDataStr || '{"years":[]}')); // โหลดและซ่อมข้อมูลเก่า
+      closeModal(); 
+      proceedCallback(); 
+      renderAll();
+  };  document.getElementById('usSave').onclick = () => { manualSave(); closeModal(); setTimeout(proceedCallback, 500); };
+}
+
+// -------------------------------------------------------------
 /* ================= SIDEBAR ================= */
 function renderSidebar(){
   const wrap = document.getElementById('yearsList');
@@ -1541,10 +1637,12 @@ function renderSidebar(){
         <button class="icon-btn" data-act="delYear" title="ลบเทอม">✕</button>
       </div>
       <div class="subjects"></div>`;
-    yEl.querySelector('.year-tab-head').addEventListener('click', e=>{
+   yEl.querySelector('.year-tab-head').addEventListener('click', e=>{
       if(e.target.closest('[data-act]')) return;
-      y.open = !y.open; sel.yearId = y.id; sel.subjectId = null; sel.unitId = null; renderAll();
-    });
+      checkUnsaved(() => {
+        y.open = !y.open; sel.yearId = y.id; sel.subjectId = null; sel.unitId = null; renderAll();
+      });
+    });  
     yEl.querySelector('[data-act="renameYear"]').onclick = e=>{ e.stopPropagation();
       openModal({title:'เปลี่ยนชื่อเทอม', fields:[{name:'name',label:'ชื่อเทอม',value:y.name}], submitLabel:'บันทึก',
         onSubmit:v=>{ if(v.name.trim()){ y.name=v.name.trim(); renderAll(); toast('บันทึกสำเร็จ'); } else {toast('ชื่อต้องไม่ว่างเปล่า!');}}});
@@ -1568,9 +1666,11 @@ function renderSidebar(){
           <button class="icon-btn" data-act="delSub" title="ลบวิชา">✕</button>
         </div>
         <div class="units"></div>`;
-      sEl.querySelector('.subject-head').addEventListener('click', e=>{
+  sEl.querySelector('.subject-head').addEventListener('click', e=>{
         if(e.target.closest('[data-act]')) return;
-        s.open = !s.open; sel.yearId=y.id; sel.subjectId=s.id; sel.unitId = null; renderAll();
+        checkUnsaved(() => {
+          s.open = !s.open; sel.yearId=y.id; sel.subjectId=s.id; sel.unitId = null; renderAll();
+        });
       });
       sEl.querySelector('[data-act="renameSub"]').onclick = e=>{ e.stopPropagation();
         openModal({title:'แก้ไขวิชา', fields:[{name:'name',label:'ชื่อวิชา',value:s.name},{name:'color',label:'สี',type:'color',value:s.color}], submitLabel:'บันทึก',
@@ -1591,9 +1691,11 @@ function renderSidebar(){
           <button class="icon-btn" data-act="delUnit" title="ลบบทเรียน">✕</button>`;
 uEl.addEventListener('click', e=>{
           if(e.target.closest('[data-act]')) return;
-          sel.yearId=y.id; sel.subjectId=s.id; sel.unitId=u.id; sel.type='note'; 
-          u._openItem = null; // <-- เคลียร์หน้ากระดาษ ให้โชว์ Grid ก่อน
-          renderAll();
+          checkUnsaved(() => {
+            sel.yearId=y.id; sel.subjectId=s.id; sel.unitId=u.id; sel.type='note'; 
+            u._openItem = null; // <-- เคลียร์หน้ากระดาษ ให้โชว์ Grid ก่อน
+            renderAll();
+          });
         });
         uEl.querySelector('[data-act="renameUnit"]').onclick = e=>{ e.stopPropagation();
           openModal({title:'เปลี่ยนชื่อบทเรียน', fields:[{name:'name',label:'ชื่อ',value:u.name}], submitLabel:'บันทึก',
@@ -1669,8 +1771,8 @@ if(!unit){
       });
     } 
     // ระดับ 1: เจาะเข้าเทอม (แสดงวิชา)
-    else if (!subj) {
-      eyebrow.textContent = 'SARUPSI  ›  ' + year.name; title.innerHTML = `<button onclick="sel.yearId=null; renderAll();" class="topbtn" style="padding:4px 10px; margin-right:12px; border-radius:8px;">← กลับ</button> 📂 วิชาทั้งหมดใน ${escapeHtml(year.name)}`;
+else if (!subj) {
+  eyebrow.textContent = 'SARUPSI  ›  ' + year.name; title.innerHTML = `<button onclick="checkUnsaved(()=>{ sel.yearId=null; renderAll(); })" class="topbtn" style="padding:4px 10px; margin-right:12px; border-radius:8px;">← กลับ</button> 📂 วิชาทั้งหมดใน ${escapeHtml(year.name)}`;
       html += `<div class="folder-card" id="addSubjCard"><div class="folder-icon folder-add">+</div><div class="folder-name" style="color:var(--text-soft);">+ สร้างวิชาใหม่</div></div>`;
       year.subjects.forEach(s => {
         html += `
@@ -1685,9 +1787,9 @@ if(!unit){
           </div>`;
       });
     } 
-    // ระดับ 2: เจาะเข้าวิชา (แสดงบทเรียน)
-    else {
-      eyebrow.textContent = `${year.name}  ›  ${subj.name}`; title.innerHTML = `<button onclick="sel.subjectId=null; renderAll();" class="topbtn" style="padding:4px 10px; margin-right:12px; border-radius:8px;">← กลับ</button> 📂 บทเรียนใน ${escapeHtml(subj.name)}`;
+  // ระดับ 2
+else {
+  eyebrow.textContent = `${year.name}  ›  ${subj.name}`; title.innerHTML = `<button onclick="checkUnsaved(()=>{ sel.subjectId=null; renderAll(); })" class="topbtn" style="padding:4px 10px; margin-right:12px; border-radius:8px;">← กลับ</button> 📂 บทเรียนใน ${escapeHtml(subj.name)}`;
       html += `<div class="folder-card" id="addUnitCard"><div class="folder-icon folder-add">+</div><div class="folder-name" style="color:var(--text-soft);">+ สร้างบทเรียน</div></div>`;
       subj.units.forEach(u => {
         html += `
@@ -1710,9 +1812,9 @@ if(!unit){
     if(document.getElementById('addSubjCard')) document.getElementById('addSubjCard').onclick = () => openModal({title:'สร้างวิชาใหม่', fields:[{name:'name',label:'ชื่อวิชา',placeholder:'เช่น Organic Chemistry'},{name:'color',label:'สีประจำวิชา',type:'color',value:SUBJECT_COLORS[year.subjects.length%SUBJECT_COLORS.length]}], submitLabel:'สร้าง', onSubmit:v=>{ if(v.name.trim()){ year.subjects.push({id:uid(),name:v.name.trim(),color:v.color,open:true,units:[]}); sel.yearId=year.id; sel.subjectId=year.subjects[year.subjects.length-1].id; sel.unitId=null; year.open=true; renderAll(); toast('สร้างสำเร็จ!');} else {toast('กรุณาตั้งชื่อด้วยครับ');}}});
     if(document.getElementById('addUnitCard')) document.getElementById('addUnitCard').onclick = () => openModal({title:'สร้างบทเรียนใหม่', fields:[{name:'name',label:'ชื่อบทเรียน',placeholder:'เช่น บทที่ 1 - บทนำ'}], submitLabel:'สร้าง', onSubmit:v=>{ if(v.name.trim()){ subj.units.push({id:uid(),name:v.name.trim(),summaries:[]}); sel.yearId=year.id; sel.subjectId=subj.id; sel.unitId=subj.units[subj.units.length-1].id; subj.open=true; year.open=true; renderAll(); toast('สร้างสำเร็จ!');} else {toast('กรุณาตั้งชื่อด้วยครับ');}}});
 
-    c.querySelectorAll('[data-nav-year]').forEach(el => el.onclick = (e) => { if(e.target.closest('.folder-btn')) return; sel.yearId=el.dataset.navYear; sel.subjectId=null; sel.unitId=null; renderAll(); });
-    c.querySelectorAll('[data-nav-subj]').forEach(el => el.onclick = (e) => { if(e.target.closest('.folder-btn')) return; sel.subjectId=el.dataset.navSubj; sel.unitId=null; renderAll(); });
-    c.querySelectorAll('[data-nav-unit]').forEach(el => el.onclick = (e) => { if(e.target.closest('.folder-btn')) return; sel.unitId=el.dataset.navUnit; sel.type='note'; renderAll(); });
+c.querySelectorAll('[data-nav-year]').forEach(el => el.onclick = (e) => { if(e.target.closest('.folder-btn')) return; checkUnsaved(()=>{ sel.yearId=el.dataset.navYear; sel.subjectId=null; sel.unitId=null; renderAll(); }); });
+c.querySelectorAll('[data-nav-subj]').forEach(el => el.onclick = (e) => { if(e.target.closest('.folder-btn')) return; checkUnsaved(()=>{ sel.subjectId=el.dataset.navSubj; sel.unitId=null; renderAll(); }); });
+c.querySelectorAll('[data-nav-unit]').forEach(el => el.onclick = (e) => { if(e.target.closest('.folder-btn')) return; checkUnsaved(()=>{ sel.unitId=el.dataset.navUnit; sel.type='note'; renderAll(); }); });
 
     c.querySelectorAll('[data-edit-y]').forEach(btn => btn.onclick = (e) => { e.stopPropagation(); const y=getYear(btn.dataset.editY); openModal({title:'เปลี่ยนชื่อเทอม', fields:[{name:'name',label:'ชื่อ',value:y.name}], submitLabel:'บันทึก', onSubmit:v=>{ if(v.name.trim()){ y.name=v.name.trim(); renderAll(); toast('บันทึกแล้ว'); } else {toast('ชื่อต้องไม่ว่างเปล่า!');}}}); });
     c.querySelectorAll('[data-del-y]').forEach(btn => btn.onclick = (e) => { e.stopPropagation(); const y=getYear(btn.dataset.delY); openModal({title:'ลบเทอมนี้?', msg:`"${y.name}" และทุกอย่างข้างในจะหายไปถาวร`, danger:true, submitLabel:'ลบทิ้ง', onSubmit:()=>{ data.years=data.years.filter(x=>x.id!==y.id); if(sel.yearId===y.id){sel.yearId=null;sel.subjectId=null;sel.unitId=null;} renderAll(); toast('ลบสำเร็จ'); }}); });
@@ -1726,33 +1828,37 @@ if(!unit){
     return;
   }
 
-  eyebrow.textContent = `${year.name}  ·  ${subj.name}`;
+eyebrow.textContent = `${year.name}  ·  ${subj.name}`;
   title.textContent = unit.name;
 
+  // 🌟 ฝังคำสั่ง handleTypeTabClick ลงไปในปุ่มเลย รับรองไม่มีทางหลุด!
   const typeTabs = TYPES.map(t=>{
     const count = unit.summaries.filter(s=>s.type===t.key).length;
-    return `<button class="type-tab ${sel.type===t.key?'active':''}" data-type="${t.key}">
+    return `<button class="type-tab ${sel.type===t.key?'active':''}" onclick="handleTypeTabClick('${t.key}')">
       <span class="tico">${t.icon}</span> ${t.label} ${count?`<span style="opacity:.55">· ${count}</span>`:''}
     </button>`;
   }).join('');
 
   c.innerHTML = `<div class="type-tabs">${typeTabs}</div><div id="typePanel"></div>`;
-c.querySelectorAll('.type-tab').forEach(btn=>{
-    btn.onclick = ()=>{ 
-      sel.type = btn.dataset.type; 
-      unit._openItem = null; // <-- รีเซ็ตให้กลับมาหน้า Grid เสมอเมื่อสลับ Tab
-      renderContent(); 
-    };
-  });
-
   renderTypePanel(unit);
 }
+
+// 🌟 ฟังก์ชันจัดการตอนกด 5 แท็บประเภทไฟล์ (เรียก Pop-up แน่นอน 100%)
+window.handleTypeTabClick = function(targetType) {
+    checkUnsaved(() => {
+        sel.type = targetType;
+        const unit = currentUnit();
+        if (unit) unit._openItem = null; // ปิดไฟล์แล้วกลับไปหน้า Grid
+        renderContent();
+    });
+};
 
 function renderTypePanel(unit){
   const panel = document.getElementById('typePanel');
   const meta = TYPES.find(t=>t.key===sel.type);
   const items = unit.summaries.filter(s=>s.type===sel.type);
 
+  // วาดแถบ Toolbar และปุ่ม + New
   panel.innerHTML = `
     <div class="panel-toolbar">
       <div class="eyebrow">${items.length} ${meta.label.toLowerCase()}${items.length===1?'':'s'}</div>
@@ -1761,7 +1867,6 @@ function renderTypePanel(unit){
     <div id="listWrap"></div>`;
 
   document.getElementById('newItemBtn').onclick = ()=> createSummary(unit, sel.type);
-
  const listWrap = document.getElementById('listWrap');
   if(items.length===0){
     listWrap.innerHTML = `<div class="empty-state" style="min-height:260px;">
@@ -1817,17 +1922,36 @@ function renderTypePanel(unit){
 }
 
 function createSummary(unit, type){
-  const item = {id:uid(), type, title:'', updatedAt:now()};
+  // 1. หาชื่อไฟล์ที่ไม่ซ้ำกัน
+  let baseName = 'ไม่มีชื่อ';
+  let newTitle = baseName;
+  let counter = 1;
+  
+  // ดึงชื่อไฟล์ทั้งหมดใน unit นี้มาเช็ก
+  const existingTitles = unit.summaries.map(s => s.title);
+  
+  // วนลูปหาชื่อที่ยังไม่ซ้ำ
+  while (existingTitles.includes(newTitle)) {
+    newTitle = `${baseName} (${counter})`;
+    counter++;
+  }
+
+  // 2. สร้างไฟล์ใหม่ด้วยชื่อที่ไม่ซ้ำ
+  const item = {id:uid(), type, title: newTitle, updatedAt:now()};
+  
   if(type==='note') item.content = '';
-if(type==='cornell') item.content = { 
-    pages: [{ id: uid(), sections: [{ id: uid(), cues: [{id:uid(), text:''}], notes: '' }], summary: '' }] 
-  };
+  if(type==='cornell') item.content = { pages: [{ id: uid(), sections: [{ id: uid(), cues: [{id:uid(), text:''}], notes: '' }], summary: '' }] };
   if(type==='mindmap') item.content = {nodes:[{id:'r', text:unit.name, x:900, y:120, color:0, parentId:null, root:true}]};
   if(type==='flashcard') item.content = {cards:[]};
   if(type==='outline') item.content = {items:[{id:uid(), text:'', level:0}]};
+  
   unit.summaries.push(item);
-  unit._openItem = item.id;
-  renderContent();
+  
+// 3. ครอบด้วย checkUnsaved เผื่อว่ากำลังเปิดไฟล์อื่นที่ลืมเซฟอยู่
+  checkUnsaved(() => {
+      unit._openItem = item.id;
+      renderContent();
+  });
 }
 
 /* ================= EDITOR ROUTER ================= */
@@ -1849,20 +1973,29 @@ function renderEditor(unit, item){
   // 2. [LOGIC FIX] แสดงปุ่ม PDF ให้ทั้ง Note และ Cornell (เพราะเป็นกระดาษ A4 ทั้งคู่)
   const showPdfBtn = (item.type === 'note' || item.type === 'cornell');
 
-  panel.innerHTML = `<div class="editor-shell" style="display:flex; flex-direction:column; height:100%;">
+panel.innerHTML = `<div class="editor-shell" style="display:flex; flex-direction:column; height:100%;">
     ${tabsHtml}
     <div class="editor-head" style="flex-shrink:0;">
       <button class="back-btn" id="backBtn" title="กลับหน้าสรุปไฟล์">←</button>
       <input class="title-input" id="titleInput" placeholder="ตั้งชื่อ ${meta.label} ที่นี่..." value="${escapeHtml(item.title)}">
+      
+      <!-- เพิ่มปุ่มบันทึกตรงนี้ครับ! -->
+      <button class="topbtn" id="saveCloudBtn" style="background: var(--amber); color: #241605; box-shadow: 0 3px 0 var(--amber-deep); border: none; margin-left: auto; margin-right: 12px; transition: 0.2s;">💾 บันทึก (Save)</button>
+
       ${showPdfBtn ? `<button class="topbtn" id="pdfBtn" style="margin-right:8px; border-radius:8px; background:white; color:var(--ink-700);">📥 โหลดเป็น PDF</button>` : ''}
       <button class="del-btn" id="delBtn">ลบทิ้ง</button>
     </div>
     <div id="editorBody" style="flex:1; display:flex; flex-direction:column; overflow:hidden;"></div>
   </div>`;
   
-  // ผูก Event สลับ Tabs สำหรับทุกประเภทไฟล์
+// ผูก Event สลับ Tabs สำหรับทุกประเภทไฟล์
   panel.querySelectorAll('[data-nav-file]').forEach(tab => {
-    tab.onclick = () => { unit._openItem = tab.dataset.navFile; renderContent(); };
+    tab.onclick = () => { 
+      checkUnsaved(() => {
+        unit._openItem = tab.dataset.navFile; 
+        renderContent(); 
+      });
+    };
   });
   
   // 3. [UX/LOGIC FIX] ระบบ Export PDF ที่ฉลาดขึ้น (รู้ว่ากำลังโหลด Note หรือ Cornell)
@@ -1913,12 +2046,21 @@ function renderEditor(unit, item){
     };
   }
 
-  // ผูกปุ่มทั่วไป
+// ผูกปุ่มทั่วไป
+  document.getElementById('saveCloudBtn').onclick = () => manualSave();
+  
+// ... เลื่อนลงมาแก้ backBtn ด้วย ...
   document.getElementById('backBtn').onclick = ()=>{ 
-    unit._openItem = null; 
-    renderContent(); 
+    checkUnsaved(()=>{ 
+      unit._openItem = null; 
+      renderContent(); 
+    }); 
   };
   document.getElementById('titleInput').oninput = e=>{ item.title=e.target.value; item.updatedAt=now(); };
+  
+  // ดักจับการพิมพ์ให้ขึ้นสถานะยังไม่เซฟ
+  document.getElementById('titleInput').addEventListener('input', () => hasUnsavedChanges = true);
+  document.getElementById('editorBody').addEventListener('input', () => hasUnsavedChanges = true);
   document.getElementById('titleInput').onblur = ()=>{ renderSidebar(); };
   
   document.getElementById('delBtn').onclick = ()=>{
@@ -3054,9 +3196,8 @@ auth.onAuthStateChanged((user) => {
         let cloudData = dataSnap.val();
         
         // 🛑 แก้บั๊ก "ลบหมดแล้วเด้งกลับมาใหม่" (Firebase ไม่เก็บ Array ว่าง)
-        if (cloudData !== null) {
-          if (!cloudData.years) cloudData.years = []; // คืนค่า Array ว่างให้ถ้าโดน Firebase ลบทิ้ง
-          data = cloudData; 
+if (cloudData !== null) {
+          data = sanitizeData(cloudData); // 🌟 ซ่อมแซมและจัดระเบียบข้อมูลทันทีที่โหลดมา
         } else {
           // ถ้าเป็น null แปลว่าเพิ่งสมัครใหม่จริงๆ
           data = { years: [] }; seed(); 
@@ -3092,6 +3233,7 @@ function manualSave() {
   // เปลี่ยนหน้าตาปุ่ม "ทันที" ไม่ต้องรอเน็ต! (ให้ผู้ใช้อุ่นใจ)
   if(saveBtn) { saveBtn.innerText = '✅ บันทึกแล้ว'; saveBtn.style.opacity = '1'; }
   toast("💾 บันทึกข้อมูลเรียบร้อย!");
+  hasUnsavedChanges = false; // รีเซ็ตสถานะหลังกดบันทึก
   
   // 💡 ทริคแก้ปัญหา: รอ 0.5 วินาที ให้ระบบจดสรุปรวบรวมตัวอักษรล่าสุดลงตัวแปรให้เสร็จก่อน แล้วค่อยส่งขึ้น Cloud
   setTimeout(() => {
@@ -3141,34 +3283,45 @@ function setupRealtimeSync(uid) {
   db.ref('users/' + uid + '/data').on('value', (snapshot) => {
     let cloudData = snapshot.val();
     
-    // ดักจับกรณีผู้ใช้ลบข้อมูลจนเกลี้ยง (Firebase จะส่งค่า null มา)
     if (cloudData === null) cloudData = { years: [] };
-    if (!cloudData.years) cloudData.years = [];
+    cloudData = sanitizeData(cloudData); // 🌟 ซ่อมข้อมูลจากการซิงค์อัตโนมัติ
 
     const cloudStr = JSON.stringify(cloudData);
     const localStr = JSON.stringify(data);
     
-    // ถ้ามีข้อมูลใหม่มาจากเครื่องอื่น
     if (cloudStr !== lastSavedDataStr && cloudStr !== localStr) {
-      
-      // 1. ผสานข้อมูลเข้าตัวแปรเงียบๆ เบื้องหลัง
-      data = preserveUIState(data, cloudData);
-      lastSavedDataStr = cloudStr; 
-      
-      // 2. อัปเดตแค่เมนูด้านซ้าย (ให้เห็นว่ามีแฟ้มใหม่) โดยไม่กวนพื้นที่ตรงกลาง
-      renderSidebar();
-      
-      // 3. เช็กว่าตอนนี้กำลัง "เปิดจดสรุป" อยู่หรือไม่?
       const unit = currentUnit();
-      const isEditing = unit && unit._openItem;
+      const openItemId = unit ? unit._openItem : null;
+      const isEditing = !!openItemId;
 
+      // ผสานข้อมูลเข้าตัวแปรเงียบๆ
+      let newData = preserveUIState(data, cloudData);
+      
+      // ถ้ายูสเซอร์กำลังพิมพ์ไฟล์อยู่ ห้ามเอาข้อมูลคลาวด์มาทับ!
+      if (hasUnsavedChanges && openItemId) {
+          const oldItem = unit.summaries.find(s => s.id === openItemId);
+          newData.years.forEach(y => {
+              y.subjects && y.subjects.forEach(s => {
+                  s.units && s.units.forEach(u => {
+                      if (u.id === unit.id) {
+                          const newIndex = u.summaries.findIndex(sum => sum.id === openItemId);
+                          if (newIndex !== -1 && oldItem) {
+                              u.summaries[newIndex] = oldItem; // ทับด้วยสิ่งที่เรากำลังพิมพ์อยู่เป๊ะๆ
+                          }
+                      }
+                  });
+              });
+          });
+      }
+
+      data = newData;
+      lastSavedDataStr = JSON.stringify(data);
+      renderSidebar(); 
+      
       if (!isEditing) {
-        // ถ้าอยู่หน้า "รวมแฟ้ม (แดชบอร์ด)" รีเฟรชตรงกลางได้เลย จะได้เห็นชีทที่เพื่อนเพิ่งสร้าง
         renderContent();
       } else {
-        // 🚫 ถ้ากำลัง "จดสรุป" อยู่ ห้ามใช้ renderContent() เด็ดขาด! 
-        // ปล่อยให้มันเซฟข้อมูลเงียบๆ ไป ไม่ต้องเด้ง ไม่ต้องแจ้งเตือนกวนใจ
-        console.log("☁️ ซิงค์ข้อมูลพื้นหลังสำเร็จ (ไม่รบกวนผู้ใช้)");
+        console.log("☁️ ซิงค์ข้อมูลพื้นหลังเรียบร้อย (พิมพ์ต่อได้เลย ไม่สะดุด)");
       }
     }
   });

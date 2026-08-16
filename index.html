@@ -1363,13 +1363,16 @@
   </aside>
 
  <div class="binder">
-    <div class="topbar">
+<div class="topbar">
       <button class="topbtn" id="menuToggle" style="display:none;">☰</button>
       <div class="crumbtitle">
         <div class="eyebrow" id="crumbEyebrow">SARUPSI</div>
         <h1 id="crumbTitle">Welcome</h1>
       </div>
-<button class="topbtn" id="cloudStatus" onclick="manualSave()" title="คลิกเพื่อบังคับเซฟ" style="font-family:'Kanit', sans-serif;">☁️ รอการเชื่อมต่อ...</button>
+      
+      <!-- เพิ่มปุ่มบันทึกตรงนี้! -->
+      <button class="topbtn" id="saveCloudBtn" style="background: var(--amber); color: #241605; box-shadow: 0 3px 0 var(--amber-deep); border: none;">💾 บันทึก (Save)</button>
+      
       <button class="topbtn" id="pomoBtn" title="Pomodoro Focus Mode" style="font-family:'JetBrains Mono',monospace;">🍅 25:00</button>
       <button class="topbtn" id="themeBtn" title="Toggle Dark Mode">🌙</button>
       <div class="search-wrap">
@@ -3028,10 +3031,9 @@ document.getElementById('app').style.display = 'none';
 // ==========================================
 // ⚡ REAL-TIME CLOUD SYNC & AUTO-SAVE (ระบบเซฟอัตโนมัติ + เด้งข้ามจอ)
 // ==========================================
-let lastSavedDataStr = ""; // ตัวแปรเก็บสถานะข้อมูลล่าสุด
-const cloudStatusBtn = document.getElementById('cloudStatus');
+let lastSavedDataStr = ""; // ตัวช่วยเช็กว่าข้อมูลล่าสุดตรงกับคลาวด์ไหม
 
-// 1. 📡 ตัวรับสัญญาณ Cloud: ใครล็อกอินอยู่ ให้โหลดข้อมูลคนนั้นลงมา
+// 1. 📡 ตัวรับสัญญาณ Cloud: ใครล็อกอินอยู่ ให้โหลดข้อมูลลงมา
 auth.onAuthStateChanged((user) => {
   if (user) {
     db.ref('users/' + user.uid + '/profile').once('value').then(snap => {
@@ -3042,7 +3044,6 @@ auth.onAuthStateChanged((user) => {
       document.getElementById('appUserId').innerText = "ID: " + activeUser.id;
       document.getElementById('appUserAvatar').src = activeUser.avatar;
 
-      // โหลดชีทสรุปจาก Cloud
       db.ref('users/' + user.uid + '/data').once('value').then(dataSnap => {
         const cloudData = dataSnap.val();
         if (cloudData && cloudData.years) {
@@ -3051,14 +3052,15 @@ auth.onAuthStateChanged((user) => {
           data = { years: [] }; seed(); 
         }
         
-        lastSavedDataStr = JSON.stringify(data); // จำไว้ว่าโหลดมาล่าสุดหน้าตาแบบไหน
-        if(cloudStatusBtn) { cloudStatusBtn.innerHTML = '☁️ เซฟขึ้นคลาวด์แล้ว'; cloudStatusBtn.style.color = 'var(--sage-deep)'; }
-
+        // จำรอยประทับของข้อมูลล่าสุดไว้ (จะได้รู้ว่ามีการแก้ไขใหม่หรือยัง)
+        lastSavedDataStr = JSON.stringify(data);
+        
         document.getElementById('authScreen').style.display = 'none';
         document.getElementById('app').style.display = window.innerWidth <= 760 ? 'block' : 'grid';
         renderAll();
         
-        setupRealtimeSync(user.uid); // เปิดหูฟังรอรับข้อมูลจากจออื่น
+        // เปิดหูฟังระบบ Live Sync
+        setupRealtimeSync(user.uid);
       });
     });
   } else {
@@ -3070,66 +3072,254 @@ auth.onAuthStateChanged((user) => {
   }
 });
 
-// 2. 🤖 ระบบ Auto-Save แสกนการเปลี่ยนแปลงทุกๆ 1.5 วินาที
-setInterval(() => {
-  if (!auth.currentUser || !data || !data.years) return;
+// 2. 💾 ระบบปุ่มบันทึก (Manual Save) ตามคำขอ!
+function manualSave() {
+  if (!auth.currentUser || !data) { toast("⚠️ กรุณาเข้าสู่ระบบก่อนบันทึก"); return; }
   
   const currentDataStr = JSON.stringify(data);
-  // เช็กว่าข้อมูลในเครื่อง "ถูกเปลี่ยนแปลง" หรือไม่ (ถ้าแก้ปุ๊บ สตริงจะไม่เหมือนเดิม)
-  if (currentDataStr !== lastSavedDataStr) {
-    
-    // เปลี่ยนปุ่มเป็นสถานะกำลังเซฟ
-    if(cloudStatusBtn) {
-      cloudStatusBtn.innerHTML = '⏳ กำลังบันทึก...';
-      cloudStatusBtn.style.color = 'var(--amber-deep)';
-    }
-
-    // ยิงข้อมูลขึ้นคลาวด์
-    db.ref('users/' + auth.currentUser.uid + '/data').set(data).then(() => {
-      lastSavedDataStr = currentDataStr; // อัปเดตข้อมูลล่าสุดที่เซฟไป
-      localStorage.setItem('sarupsi_sel', JSON.stringify(sel));
-      
-      // เปลี่ยนปุ่มกลับเป็นสถานะสำเร็จ
-      if(cloudStatusBtn) {
-        cloudStatusBtn.innerHTML = '☁️ เซฟขึ้นคลาวด์แล้ว';
-        cloudStatusBtn.style.color = 'var(--sage-deep)';
-      }
-    });
-  }
-}, 1500);
-
-// 3. 💾 ปุ่มบังคับเซฟ (Manual Save) ตอบโจทย์ User
-function manualSave() {
-  if (!auth.currentUser) return;
+  const saveBtn = document.getElementById('saveCloudBtn');
+  
+  // โชว์สถานะกำลังบันทึกให้ User อุ่นใจ
+  if(saveBtn) { saveBtn.innerText = '⏳ กำลังบันทึก...'; saveBtn.style.opacity = '0.7'; }
+  
   db.ref('users/' + auth.currentUser.uid + '/data').set(data).then(() => {
-    lastSavedDataStr = JSON.stringify(data);
-    toast("💾 บังคับบันทึกข้อมูลเรียบร้อย!");
-    if(cloudStatusBtn) {
-      cloudStatusBtn.innerHTML = '☁️ เซฟขึ้นคลาวด์แล้ว';
-      cloudStatusBtn.style.color = 'var(--sage-deep)';
-    }
+     lastSavedDataStr = currentDataStr; // อัปเดตข้อมูลล่าสุด
+     localStorage.setItem('sarupsi_sel', JSON.stringify(sel));
+     
+     if(saveBtn) { saveBtn.innerText = '✅ บันทึกแล้ว'; saveBtn.style.opacity = '1'; }
+     toast("💾 บันทึกข้อมูลขึ้น Cloud สำเร็จ!");
+     
+     // ผ่านไป 3 วินาที คืนปุ่มกลับสู่สภาพเดิม
+     setTimeout(() => { if(saveBtn) saveBtn.innerText = '💾 บันทึก (Save)'; }, 3000);
+  }).catch(err => {
+     toast("❌ บันทึกไม่สำเร็จ: " + err.message);
+     if(saveBtn) { saveBtn.innerText = '💾 บันทึก (Save)'; saveBtn.style.opacity = '1'; }
   });
 }
+// ผูกปุ่มบันทึกที่แถบเมนูเข้ากับฟังก์ชัน
+if (document.getElementById('saveCloudBtn')) {
+  document.getElementById('saveCloudBtn').onclick = manualSave;
+}
 
-// 4. ⚡ ตัวดักฟังข้อมูลรับเข้า (เปิด 2 จอ เด้งเข้าหากัน)
+// 3. 🛡️ ฟังก์ชันแยกหน้าจอ (ป้องกันหน้าต่างกระโดดตามกันเวลาซิงค์)
+function preserveUIState(oldData, newData) {
+   if (!oldData || !newData || !newData.years) return newData;
+   // ถ่ายโอนสถานะ "การเปิด/ปิด" โฟลเดอร์จากเครื่องเดิม ไปใส่ข้อมูลที่เพิ่งโหลดมา
+   newData.years.forEach(newY => {
+      const oldY = oldData.years.find(y => y.id === newY.id);
+      if (oldY && oldY.open !== undefined) newY.open = oldY.open;
+      if (newY.subjects) {
+         newY.subjects.forEach(newS => {
+            const oldS = oldY ? oldY.subjects.find(s => s.id === newS.id) : null;
+            if (oldS && oldS.open !== undefined) newS.open = oldS.open;
+            if (newS.units) {
+               newS.units.forEach(newU => {
+                  const oldU = oldS ? oldS.units.find(u => u.id === newU.id) : null;
+                  // รักษาให้รู้ว่าเครื่องนี้เปิดไฟล์ไหนค้างไว้
+                  if (oldU && oldU._openItem !== undefined) newU._openItem = oldU._openItem;
+               });
+            }
+         });
+      }
+   });
+   return newData;
+}
+
+// 4. ⚡ ระบบซิงค์ข้อมูลสด (อัปเดตเฉพาะเนื้อหา หน้าจอไม่กระโดด)
 function setupRealtimeSync(uid) {
   db.ref('users/' + uid + '/data').on('value', (snapshot) => {
     const cloudData = snapshot.val();
     if (cloudData && cloudData.years) {
-      const localStr = JSON.stringify(data);
       const cloudStr = JSON.stringify(cloudData);
+      const localStr = JSON.stringify(data);
       
-      // ถ้าข้อมูลที่วิ่งมาจาก Cloud "ใหม่กว่า/ไม่ตรงกับ" ในเครื่องเรา ให้เด้งอัปเดตหน้าจอทันที
-      if (localStr !== cloudStr && cloudStr !== lastSavedDataStr) {
-        data = cloudData;
-        lastSavedDataStr = cloudStr; // ป้องกันการเด้งเซฟกลับไปกลับมา
+      // ถ้าข้อมูลบนคลาวด์มีการเปลี่ยนแปลง (เครื่องอื่นกดเซฟ)
+      if (cloudStr !== lastSavedDataStr && cloudStr !== localStr) {
+        // ใช้ฟังก์ชันรักษาหน้าจอ ก่อนเอาข้อมูลใหม่มาทับ
+        data = preserveUIState(data, cloudData);
+        lastSavedDataStr = cloudStr; // อัปเดตประวัติ
         
         renderSidebar();
         renderContent();
-        toast("⚡ ข้อมูลถูกอัปเดตจากอีกหน้าจอ!");
+        toast("⚡ อัปเดตข้อมูลล่าสุดจากหน้าจออื่นแล้ว!");
       }
     }
   });
+}
+
+// 5. 🤖 Auto-save กันเหนียวแบบเงียบๆ ทุก 10 วินาที
+setInterval(() => {
+   if (!auth.currentUser || !data) return;
+   const currentDataStr = JSON.stringify(data);
+   // ถ้าพบว่าข้อมูลในเครื่องถูกแก้ไข (แต่ User ลืมกดปุ่มเซฟ) มันจะแอบดันขึ้นคลาวด์ให้เอง
+   if (currentDataStr !== lastSavedDataStr) {
+       db.ref('users/' + auth.currentUser.uid + '/data').set(data).then(() => {
+          lastSavedDataStr = currentDataStr;
+       });
+   }
+}, 10000);
+
+// (นำฟังก์ชันแจ้งเตือน ระบบล็อกอิน และ Avatar มาใส่คืนด้านล่าง)
+function showAuthMsg(msg, type) {
+  const msgBox = document.getElementById('authMsg');
+  let icon = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '⏳';
+  msgBox.style.display = 'none'; void msgBox.offsetWidth; 
+  msgBox.className = `auth-msg ${type}`;
+  msgBox.innerHTML = `<span>${icon}</span> <span style="line-height:1.4;">${msg}</span>`;
+  msgBox.style.display = 'flex'; 
+}
+
+function switchAuthView(view) {
+  document.getElementById('viewProfiles').style.display = 'none';
+  document.getElementById('viewLogin').style.display = 'none';
+  document.getElementById('viewRegister').style.display = 'none';
+  document.getElementById('authMsg').style.display = 'none'; 
+  if (view === 'profiles') {
+    document.getElementById('viewProfiles').style.display = 'block';
+    document.getElementById('authSubtitle').innerText = 'ยินดีต้อนรับกลับมา! เลือกบัญชีของคุณ';
+  } else if (view === 'login') {
+    document.getElementById('viewLogin').style.display = 'block';
+    document.getElementById('authSubtitle').innerText = 'เข้าสู่ระบบเพื่อจดสรุปต่อ';
+    document.getElementById('loginId').value = ''; document.getElementById('loginPwd').value = '';
+  } else if (view === 'register') {
+    document.getElementById('viewRegister').style.display = 'block';
+    document.getElementById('authSubtitle').innerText = 'ลงทะเบียนเพื่อเริ่มต้นใช้งาน SARUPSI';
+  }
+}
+
+function togglePwd(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  if (inp.type === 'password') { inp.type = 'text'; btn.innerText = '👁️‍🗨️'; } else { inp.type = 'password'; btn.innerText = '👁️'; }
+}
+
+function doRegister() {
+  const name = document.getElementById('regName').value.trim();
+  const id = document.getElementById('regId').value.trim();
+  const pwd = document.getElementById('regPwd').value;
+  const pwdConfirm = document.getElementById('regPwdConfirm').value;
+  if (!name || !id || !pwd) return showAuthMsg('กรุณากรอกข้อมูลให้ครบทุกช่องครับ', 'warning');
+  if (pwd.length < 6) return showAuthMsg('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', 'warning');
+  if (pwd !== pwdConfirm) return showAuthMsg('รหัสผ่านไม่ตรงกัน กรุณาเช็กอีกครั้ง', 'error');
+  
+  const email = id + "@sarupsi.com"; 
+  const avatar = `https://api.dicebear.com/7.x/micah/svg?seed=${encodeURIComponent(name)}&backgroundColor=fdfbf7`;
+  showAuthMsg('กำลังสร้างบัญชีบน Cloud...', 'info');
+
+  auth.createUserWithEmailAndPassword(email, pwd)
+    .then((userCred) => { return db.ref('users/' + userCred.user.uid + '/profile').set({ name, id, avatar }); })
+    .then(() => { showAuthMsg('สมัครสำเร็จ! ยินดีต้อนรับสู่ SARUPSI 🎉', 'success'); })
+    .catch((error) => {
+      if(error.code === 'auth/email-already-in-use') {
+        showAuthMsg('รหัส ID นี้มีบัญชีอยู่แล้ว! กำลังพากลับไปหน้าเข้าสู่ระบบ...', 'error');
+        setTimeout(() => { switchAuthView('login'); document.getElementById('loginId').value = id; }, 2000);
+      } else { showAuthMsg('เกิดข้อผิดพลาด: ' + error.message, 'error'); }
+    });
+}
+
+function doLogin() {
+  const id = document.getElementById('loginId').value.trim();
+  const pwd = document.getElementById('loginPwd').value;
+  if (!id || !pwd) return showAuthMsg('กรุณากรอก ID และรหัสผ่าน', 'warning');
+
+  showAuthMsg('กำลังตรวจสอบข้อมูล...', 'info');
+  const email = id + "@sarupsi.com";
+
+  auth.signInWithEmailAndPassword(email, pwd)
+    .then((userCred) => {
+       showAuthMsg('เข้าสู่ระบบสำเร็จ! กำลังเตรียมข้อมูล...', 'success');
+       db.ref('users/' + userCred.user.uid + '/profile').once('value').then(snap => {
+         const pf = snap.val();
+         if(pf && !savedLogins.find(u => u.id === pf.id)) {
+           savedLogins.push({ id: pf.id, name: pf.name, avatar: pf.avatar });
+           localStorage.setItem('sarupsi_saved_logins', JSON.stringify(savedLogins));
+         }
+       });
+    })
+    .catch((error) => {
+      document.getElementById('loginPwd').value = ''; document.getElementById('loginPwd').focus();
+      if(error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+         showAuthMsg('ID หรือรหัสผ่านไม่ถูกต้อง กรุณาลองใหม่', 'error');
+      } else if (error.code === 'auth/too-many-requests') {
+         showAuthMsg('ใส่รหัสผิดบ่อยเกินไป ระบบระงับชั่วคราว กรุณารอสักครู่ 🚫', 'error');
+      } else { showAuthMsg('เข้าสู่ระบบไม่ได้: ' + error.message, 'error'); }
+    });
+}
+
+function forgotPassword() {
+  const id = document.getElementById('loginId').value.trim();
+  if (!id) { showAuthMsg('กรุณากรอกรหัสประจำตัว (ID) ก่อนกดลืมรหัสผ่านครับ 💡', 'warning'); document.getElementById('loginId').focus(); } 
+  else { showAuthMsg(`บัญชี ${id}: เนื่องจากเป็นระบบภายใน กรุณาติดต่อ Admin (SUKI) เพื่อรีเซ็ตรหัสผ่านครับ 🛠️`, 'info'); }
+}
+
+function loginWithProfile(id) {
+  switchAuthView('login'); document.getElementById('loginId').value = id; document.getElementById('loginPwd').focus();
+  showAuthMsg(`บัญชี ${id}: กรุณากรอกรหัสผ่านเพื่อเข้าใช้งาน 🔐`, 'info');
+}
+
+function renderSavedProfiles() {
+  const wrap = document.getElementById('profilesList'); wrap.innerHTML = '';
+  savedLogins.forEach(user => {
+    wrap.innerHTML += `
+      <div class="profile-card" onclick="loginWithProfile('${user.id}')">
+        <button class="profile-remove" onclick="removeProfile(event, '${user.id}')" title="ลบบัญชีนี้ออก">✕</button>
+        <div class="profile-avatar"><img src="${user.avatar}"></div>
+        <div class="profile-name">${escapeHtml(user.name)}</div>
+      </div>
+    `;
+  });
+}
+
+function removeProfile(event, id) {
+  event.stopPropagation(); savedLogins = savedLogins.filter(u => u.id !== id);
+  localStorage.setItem('sarupsi_saved_logins', JSON.stringify(savedLogins));
+  if (savedLogins.length === 0) switchAuthView('login'); else renderSavedProfiles();
+}
+
+function doLogout() { auth.signOut(); }
+
+function openAvatarStudio() {
+  if (!activeUser) return;
+  let currentStyle = 'micah', currentSeed = activeUser.name, currentBg = 'fdfbf7';
+  try {
+    const url = new URL(activeUser.avatar);
+    const pathParts = url.pathname.split('/');
+    currentStyle = pathParts[pathParts.length - 2] || 'micah';
+    currentSeed = url.searchParams.get('seed') || activeUser.name;
+    currentBg = url.searchParams.get('backgroundColor') || 'fdfbf7';
+  } catch(e) {}
+
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="modal-overlay" id="ovlStudio" style="z-index: 10000; background: rgba(15,23,42,0.7); backdrop-filter: blur(4px);">
+      <div class="modal-box" style="width: 380px; text-align: center; border-radius: 24px; padding: 32px 24px;">
+        <h3 style="margin-bottom: 24px; font-size: 20px; color: var(--ink-900);">🎨 Avatar Studio</h3>
+        <div id="avPreviewWrap" style="width: 140px; height: 140px; margin: 0 auto 24px; border-radius: 50%; box-shadow: 0 10px 30px rgba(0,0,0,0.15); overflow: hidden; border: 4px solid #fff; background: #${currentBg}; transition: background 0.3s;">
+          <img id="avPreview" src="${activeUser.avatar}" style="width:100%; height:100%; object-fit:cover;">
+        </div>
+        <div style="text-align: left; display: flex; flex-direction: column; gap: 16px;">
+          <div><label style="font-size: 13px; font-weight: 600; color: var(--text-soft); display:block; margin-bottom:6px;">1. เลือกลายเส้น (Art Style)</label><select id="avStyle" style="width: 100%; padding: 12px; border-radius: 12px; border: 2px solid var(--paper-line); font-family: 'Inter', 'Kanit', sans-serif; font-size: 14px; outline: none; cursor:pointer; background:#fff;"><option value="micah" ${currentStyle==='micah'?'selected':''}>🧑 Micah (คนมินิมอล)</option><option value="avataaars" ${currentStyle==='avataaars'?'selected':''}>👤 Avataaars (คนสไตล์แอปเปิล)</option><option value="lorelei" ${currentStyle==='lorelei'?'selected':''}>🎀 Lorelei (การ์ตูนสีน้ำ)</option><option value="fun-emoji" ${currentStyle==='fun-emoji'?'selected':''}>😍 Fun Emoji (อิโมจิน่ารักๆ)</option><option value="bottts" ${currentStyle==='bottts'?'selected':''}>🤖 Bottts (หุ่นยนต์สุดเท่)</option><option value="adventurer" ${currentStyle==='adventurer'?'selected':''}>⚔️ Adventurer (สาย RPG)</option></select></div>
+          <div><label style="font-size: 13px; font-weight: 600; color: var(--text-soft); display:block; margin-bottom:6px;">2. พิมพ์มั่วๆ เพื่อสุ่มหน้าตา (Magic Seed)</label><div style="display:flex; gap:8px;"><input type="text" id="avSeed" value="${escapeHtml(currentSeed)}" style="flex:1; padding: 12px; border-radius: 12px; border: 2px solid var(--paper-line); font-family: inherit; font-size: 14px; outline: none;" placeholder="พิมพ์อะไรก็ได้..."><button id="avDice" style="padding: 0 16px; border-radius: 12px; border: none; background: var(--amber); color:#fff; cursor: pointer; font-size:20px; transition:0.2s;" title="ทอยเต๋าสุ่มหน้า">🎲</button></div></div>
+          <div><label style="font-size: 13px; font-weight: 600; color: var(--text-soft); display:block; margin-bottom:6px;">3. สีพื้นหลัง (Background Color)</label><input type="color" id="avBg" value="#${currentBg === 'transparent' ? 'ffffff' : currentBg}" style="width: 100%; height: 44px; border-radius: 12px; border: 2px solid var(--paper-line); cursor: pointer; padding: 2px; background:#fff;"></div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top: 32px;"><button style="flex:1; background: var(--paper); border: none; padding: 14px; border-radius: 12px; font-weight: 600; color: var(--text-soft); cursor: pointer;" onclick="closeModal()">ยกเลิก</button><button style="flex:2; background: linear-gradient(135deg, #4f46e5, #818cf8); border: none; padding: 14px; border-radius: 12px; font-weight: 600; color: #fff; cursor: pointer; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);" id="saveAvatarBtn">✨ บันทึกโปรไฟล์</button></div>
+      </div>
+    </div>
+  `;
+  
+  const styleSel = document.getElementById('avStyle'); const seedInp = document.getElementById('avSeed'); const bgInp = document.getElementById('avBg'); const preview = document.getElementById('avPreview'); const previewWrap = document.getElementById('avPreviewWrap');
+  const updatePreview = () => { const style = styleSel.value; const seed = encodeURIComponent(seedInp.value || 'smile'); const bg = bgInp.value.replace('#', ''); preview.src = `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}&backgroundColor=${bg}`; previewWrap.style.backgroundColor = '#' + bg; };
+  styleSel.addEventListener('change', updatePreview); seedInp.addEventListener('input', updatePreview); bgInp.addEventListener('input', updatePreview);
+  document.getElementById('avDice').onclick = () => { seedInp.value = uid(); updatePreview(); };
+  document.getElementById('ovlStudio').addEventListener('click', e => { if(e.target.id === 'ovlStudio') closeModal(); });
+  
+  document.getElementById('saveAvatarBtn').onclick = () => {
+     activeUser.avatar = preview.src;
+     db.ref('users/' + auth.currentUser.uid + '/profile').update({ avatar: activeUser.avatar });
+     const sIndex = savedLogins.findIndex(u => u.id === activeUser.id);
+     if(sIndex !== -1) { savedLogins[sIndex].avatar = activeUser.avatar; localStorage.setItem('sarupsi_saved_logins', JSON.stringify(savedLogins)); }
+     document.getElementById('appUserAvatar').src = activeUser.avatar;
+     closeModal(); toast('✨ อัปเดตรูปโปรไฟล์ขึ้น Cloud เรียบร้อย!');
+  };
 }
 </script>
 </body>

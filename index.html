@@ -254,7 +254,13 @@
     border-bottom:1px solid var(--paper-line);
   }
   .crumbtitle{flex:1;min-width:0;}
-  .crumbtitle .eyebrow{margin-bottom:2px;}
+  .crumbtitle .eyebrow {
+    margin-bottom: 2px;
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+    display: block;
+  }
   .crumbtitle h1{
     font-size:21px;font-weight:600;margin:0;color:var(--ink-900);
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
@@ -3045,11 +3051,16 @@ auth.onAuthStateChanged((user) => {
       document.getElementById('appUserAvatar').src = activeUser.avatar;
 
       db.ref('users/' + user.uid + '/data').once('value').then(dataSnap => {
-        const cloudData = dataSnap.val();
-        if (cloudData && cloudData.years) {
+        let cloudData = dataSnap.val();
+        
+        // 🛑 แก้บั๊ก "ลบหมดแล้วเด้งกลับมาใหม่" (Firebase ไม่เก็บ Array ว่าง)
+        if (cloudData !== null) {
+          if (!cloudData.years) cloudData.years = []; // คืนค่า Array ว่างให้ถ้าโดน Firebase ลบทิ้ง
           data = cloudData; 
         } else {
+          // ถ้าเป็น null แปลว่าเพิ่งสมัครใหม่จริงๆ
           data = { years: [] }; seed(); 
+          db.ref('users/' + user.uid + '/data').set(data); // แอบเซฟไฟล์ Tutorial ขึ้น Cloud ไปเลย
         }
         
         // จำรอยประทับของข้อมูลล่าสุดไว้ (จะได้รู้ว่ามีการแก้ไขใหม่หรือยัง)
@@ -3095,14 +3106,15 @@ function manualSave() {
      if(saveBtn) { saveBtn.innerText = '💾 บันทึก (Save)'; }
   });
 }
-// ผูกปุ่มบันทึกที่แถบเมนูเข้ากับฟังก์ชัน
 if (document.getElementById('saveCloudBtn')) {
   document.getElementById('saveCloudBtn').onclick = manualSave;
 }
 
 // 3. 🛡️ ฟังก์ชันแยกหน้าจอ (ป้องกันหน้าต่างกระโดดตามกันเวลาซิงค์)
 function preserveUIState(oldData, newData) {
-   if (!oldData || !newData || !newData.years) return newData;
+   if (!oldData || !newData) return newData;
+   if (!newData.years) newData.years = []; // ดัก Firebase ลบ Array ว่าง
+   
    // ถ่ายโอนสถานะ "การเปิด/ปิด" โฟลเดอร์จากเครื่องเดิม ไปใส่ข้อมูลที่เพิ่งโหลดมา
    newData.years.forEach(newY => {
       const oldY = oldData.years.find(y => y.id === newY.id);
@@ -3127,33 +3139,36 @@ function preserveUIState(oldData, newData) {
 // 4. ⚡ ระบบซิงค์ข้อมูลสด (อัปเดตเงียบๆ ไม่กระชากหน้าจอ!)
 function setupRealtimeSync(uid) {
   db.ref('users/' + uid + '/data').on('value', (snapshot) => {
-    const cloudData = snapshot.val();
-    if (cloudData && cloudData.years) {
-      const cloudStr = JSON.stringify(cloudData);
-      const localStr = JSON.stringify(data);
-      
-      // ถ้ามีข้อมูลใหม่มาจากเครื่องอื่น
-      if (cloudStr !== lastSavedDataStr && cloudStr !== localStr) {
-        
-        // 1. ผสานข้อมูลเข้าตัวแปรเงียบๆ เบื้องหลัง
-        data = preserveUIState(data, cloudData);
-        lastSavedDataStr = cloudStr; 
-        
-        // 2. อัปเดตแค่เมนูด้านซ้าย (ให้เห็นว่ามีแฟ้มใหม่) โดยไม่กวนพื้นที่ตรงกลาง
-        renderSidebar();
-        
-        // 3. เช็กว่าตอนนี้กำลัง "เปิดจดสรุป" อยู่หรือไม่?
-        const unit = currentUnit();
-        const isEditing = unit && unit._openItem;
+    let cloudData = snapshot.val();
+    
+    // ดักจับกรณีผู้ใช้ลบข้อมูลจนเกลี้ยง (Firebase จะส่งค่า null มา)
+    if (cloudData === null) cloudData = { years: [] };
+    if (!cloudData.years) cloudData.years = [];
 
-        if (!isEditing) {
-          // ถ้าอยู่หน้า "รวมแฟ้ม (แดชบอร์ด)" รีเฟรชตรงกลางได้เลย จะได้เห็นชีทที่เพื่อนเพิ่งสร้าง
-          renderContent();
-        } else {
-          // 🚫 ถ้ากำลัง "จดสรุป" อยู่ ห้ามใช้ renderContent() เด็ดขาด! 
-          // ปล่อยให้มันเซฟข้อมูลเงียบๆ ไป ไม่ต้องเด้ง ไม่ต้องแจ้งเตือนกวนใจ
-          console.log("☁️ ซิงค์ข้อมูลพื้นหลังสำเร็จ (ไม่รบกวนผู้ใช้)");
-        }
+    const cloudStr = JSON.stringify(cloudData);
+    const localStr = JSON.stringify(data);
+    
+    // ถ้ามีข้อมูลใหม่มาจากเครื่องอื่น
+    if (cloudStr !== lastSavedDataStr && cloudStr !== localStr) {
+      
+      // 1. ผสานข้อมูลเข้าตัวแปรเงียบๆ เบื้องหลัง
+      data = preserveUIState(data, cloudData);
+      lastSavedDataStr = cloudStr; 
+      
+      // 2. อัปเดตแค่เมนูด้านซ้าย (ให้เห็นว่ามีแฟ้มใหม่) โดยไม่กวนพื้นที่ตรงกลาง
+      renderSidebar();
+      
+      // 3. เช็กว่าตอนนี้กำลัง "เปิดจดสรุป" อยู่หรือไม่?
+      const unit = currentUnit();
+      const isEditing = unit && unit._openItem;
+
+      if (!isEditing) {
+        // ถ้าอยู่หน้า "รวมแฟ้ม (แดชบอร์ด)" รีเฟรชตรงกลางได้เลย จะได้เห็นชีทที่เพื่อนเพิ่งสร้าง
+        renderContent();
+      } else {
+        // 🚫 ถ้ากำลัง "จดสรุป" อยู่ ห้ามใช้ renderContent() เด็ดขาด! 
+        // ปล่อยให้มันเซฟข้อมูลเงียบๆ ไป ไม่ต้องเด้ง ไม่ต้องแจ้งเตือนกวนใจ
+        console.log("☁️ ซิงค์ข้อมูลพื้นหลังสำเร็จ (ไม่รบกวนผู้ใช้)");
       }
     }
   });

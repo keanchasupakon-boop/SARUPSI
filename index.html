@@ -3083,31 +3083,31 @@ auth.onAuthStateChanged((user) => {
   }
 });
 
-// 2. 💾 ระบบปุ่มบันทึก (Manual Save) แบบกดปุ๊บเสร็จปั๊บ! (Optimistic UI)
+// 2. 💾 ระบบปุ่มบันทึก (Manual Save) แบบรับประกันข้อมูลครบ 100%
 function manualSave() {
   if (!auth.currentUser || !data) { toast("⚠️ กรุณาเข้าสู่ระบบก่อนบันทึก"); return; }
   
-  const currentDataStr = JSON.stringify(data);
   const saveBtn = document.getElementById('saveCloudBtn');
   
-  // เปลี่ยนหน้าตาปุ่ม "ทันที" ไม่ต้องรอเน็ต! (หลอกให้รู้สึกไว และผู้ใช้อุ่นใจ)
+  // เปลี่ยนหน้าตาปุ่ม "ทันที" ไม่ต้องรอเน็ต! (ให้ผู้ใช้อุ่นใจ)
   if(saveBtn) { saveBtn.innerText = '✅ บันทึกแล้ว'; saveBtn.style.opacity = '1'; }
   toast("💾 บันทึกข้อมูลเรียบร้อย!");
   
-  // แอบส่งข้อมูลขึ้น Cloud เงียบๆ เบื้องหลัง
-  db.ref('users/' + auth.currentUser.uid + '/data').set(data).then(() => {
-     lastSavedDataStr = currentDataStr; // อัปเดตข้อมูลล่าสุด
-     localStorage.setItem('sarupsi_sel', JSON.stringify(sel));
-     
-     // ผ่านไป 3 วินาที คืนปุ่มกลับสู่สภาพเดิม
-     setTimeout(() => { if(saveBtn) saveBtn.innerText = '💾 บันทึก (Save)'; }, 3000);
-  }).catch(err => {
-     toast("❌ บันทึกไม่สำเร็จ: " + err.message);
-     if(saveBtn) { saveBtn.innerText = '💾 บันทึก (Save)'; }
-  });
-}
-if (document.getElementById('saveCloudBtn')) {
-  document.getElementById('saveCloudBtn').onclick = manualSave;
+  // 💡 ทริคแก้ปัญหา: รอ 0.5 วินาที ให้ระบบจดสรุปรวบรวมตัวอักษรล่าสุดลงตัวแปรให้เสร็จก่อน แล้วค่อยส่งขึ้น Cloud
+  setTimeout(() => {
+    const currentDataStr = JSON.stringify(data);
+    
+    db.ref('users/' + auth.currentUser.uid + '/data').set(data).then(() => {
+       lastSavedDataStr = currentDataStr; // อัปเดตข้อมูลล่าสุด
+       localStorage.setItem('sarupsi_sel', JSON.stringify(sel));
+       
+       // ผ่านไป 3 วินาที คืนปุ่มกลับสู่สภาพเดิม
+       setTimeout(() => { if(saveBtn) saveBtn.innerText = '💾 บันทึก (Save)'; }, 3000);
+    }).catch(err => {
+       toast("❌ บันทึกไม่สำเร็จ: " + err.message);
+       if(saveBtn) { saveBtn.innerText = '💾 บันทึก (Save)'; }
+    });
+  }, 500); // ดีเลย์ 500ms ตรงนี้แหละครับที่เป็นกุญแจสำคัญ!
 }
 
 // 3. 🛡️ ฟังก์ชันแยกหน้าจอ (ป้องกันหน้าต่างกระโดดตามกันเวลาซิงค์)

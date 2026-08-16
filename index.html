@@ -2189,13 +2189,15 @@ function renderCornellEditor(item){
       ta.addEventListener('input', triggerSave);
     });
 
-    // 3. ปุ่มกดเพิ่ม Keyword ใน Section เดิม
+// 3. ปุ่มกดเพิ่ม Keyword ใน Section เดิม
     document.querySelectorAll('[data-add-cue]').forEach(btn => {
       btn.onclick = () => {
+        saveDataToModel(); // 🌟 เก็บข้อมูลปัจจุบันก่อน
         const page = item.content.pages.find(p => p.id === btn.dataset.page);
         const sec = page.sections.find(s => s.id === btn.dataset.addCue);
         sec.cues.push({ id: uid(), text: '' });
-        saveDataToModel(); drawCornellPages(); // วาดใหม่เพื่อโชว์การ์ด
+        hasUnsavedChanges = true; // แจ้งระบบว่ามีการแก้
+        drawCornellPages(); // วาดหน้าจอใหม่
       };
     });
 
@@ -2205,8 +2207,10 @@ function renderCornellEditor(item){
         const page = item.content.pages.find(p => p.id === btn.dataset.page);
         const sec = page.sections.find(s => s.id === btn.dataset.sec);
         if(sec.cues.length > 1) { // บังคับให้เหลืออย่างน้อย 1 ใบ
+          saveDataToModel(); // 🌟 เก็บข้อมูลปัจจุบันก่อน
           sec.cues = sec.cues.filter(c => c.id !== btn.dataset.delCue);
-          saveDataToModel(); drawCornellPages();
+          hasUnsavedChanges = true;
+          drawCornellPages();
         } else { toast("ต้องมีอย่างน้อย 1 คีย์เวิร์ดครับ"); }
       };
     });
@@ -2214,18 +2218,22 @@ function renderCornellEditor(item){
     // 5. ปุ่มเพิ่ม Section ใหม่ (คู่เนื้อหาใหม่)
     document.querySelectorAll('[data-add-sec]').forEach(btn => {
       btn.onclick = () => {
+        saveDataToModel(); // 🌟 เก็บข้อมูลปัจจุบันก่อน
         const page = item.content.pages.find(p => p.id === btn.dataset.addSec);
         page.sections.push({ id: uid(), cues: [{id:uid(), text:''}], notes: '' });
-        saveDataToModel(); drawCornellPages();
+        hasUnsavedChanges = true;
+        drawCornellPages(); // วาดหน้าจอใหม่ปุ๊บ โผล่ปั๊บ!
       };
     });
 
     // 6. ปุ่มลบ Section ทิ้ง
     document.querySelectorAll('[data-del-sec]').forEach(btn => {
       btn.onclick = () => {
+        saveDataToModel(); // 🌟 เก็บข้อมูลปัจจุบันก่อน
         const page = item.content.pages.find(p => p.id === btn.dataset.page);
         page.sections = page.sections.filter(s => s.id !== btn.dataset.delSec);
-        saveDataToModel(); drawCornellPages();
+        hasUnsavedChanges = true;
+        drawCornellPages();
       };
     });
   }

@@ -3072,28 +3072,27 @@ auth.onAuthStateChanged((user) => {
   }
 });
 
-// 2. 💾 ระบบปุ่มบันทึก (Manual Save) ตามคำขอ!
+// 2. 💾 ระบบปุ่มบันทึก (Manual Save) แบบกดปุ๊บเสร็จปั๊บ! (Optimistic UI)
 function manualSave() {
   if (!auth.currentUser || !data) { toast("⚠️ กรุณาเข้าสู่ระบบก่อนบันทึก"); return; }
   
   const currentDataStr = JSON.stringify(data);
   const saveBtn = document.getElementById('saveCloudBtn');
   
-  // โชว์สถานะกำลังบันทึกให้ User อุ่นใจ
-  if(saveBtn) { saveBtn.innerText = '⏳ กำลังบันทึก...'; saveBtn.style.opacity = '0.7'; }
+  // เปลี่ยนหน้าตาปุ่ม "ทันที" ไม่ต้องรอเน็ต! (หลอกให้รู้สึกไว และผู้ใช้อุ่นใจ)
+  if(saveBtn) { saveBtn.innerText = '✅ บันทึกแล้ว'; saveBtn.style.opacity = '1'; }
+  toast("💾 บันทึกข้อมูลเรียบร้อย!");
   
+  // แอบส่งข้อมูลขึ้น Cloud เงียบๆ เบื้องหลัง
   db.ref('users/' + auth.currentUser.uid + '/data').set(data).then(() => {
      lastSavedDataStr = currentDataStr; // อัปเดตข้อมูลล่าสุด
      localStorage.setItem('sarupsi_sel', JSON.stringify(sel));
-     
-     if(saveBtn) { saveBtn.innerText = '✅ บันทึกแล้ว'; saveBtn.style.opacity = '1'; }
-     toast("💾 บันทึกข้อมูลขึ้น Cloud สำเร็จ!");
      
      // ผ่านไป 3 วินาที คืนปุ่มกลับสู่สภาพเดิม
      setTimeout(() => { if(saveBtn) saveBtn.innerText = '💾 บันทึก (Save)'; }, 3000);
   }).catch(err => {
      toast("❌ บันทึกไม่สำเร็จ: " + err.message);
-     if(saveBtn) { saveBtn.innerText = '💾 บันทึก (Save)'; saveBtn.style.opacity = '1'; }
+     if(saveBtn) { saveBtn.innerText = '💾 บันทึก (Save)'; }
   });
 }
 // ผูกปุ่มบันทึกที่แถบเมนูเข้ากับฟังก์ชัน
@@ -3125,7 +3124,7 @@ function preserveUIState(oldData, newData) {
    return newData;
 }
 
-// 4. ⚡ ระบบซิงค์ข้อมูลสด (อัปเดตเฉพาะเนื้อหา หน้าจอไม่กระโดด)
+// 4. ⚡ ระบบซิงค์ข้อมูลสด (อัปเดตเงียบๆ ไม่กระชากหน้าจอ!)
 function setupRealtimeSync(uid) {
   db.ref('users/' + uid + '/data').on('value', (snapshot) => {
     const cloudData = snapshot.val();
@@ -3133,15 +3132,28 @@ function setupRealtimeSync(uid) {
       const cloudStr = JSON.stringify(cloudData);
       const localStr = JSON.stringify(data);
       
-      // ถ้าข้อมูลบนคลาวด์มีการเปลี่ยนแปลง (เครื่องอื่นกดเซฟ)
+      // ถ้ามีข้อมูลใหม่มาจากเครื่องอื่น
       if (cloudStr !== lastSavedDataStr && cloudStr !== localStr) {
-        // ใช้ฟังก์ชันรักษาหน้าจอ ก่อนเอาข้อมูลใหม่มาทับ
-        data = preserveUIState(data, cloudData);
-        lastSavedDataStr = cloudStr; // อัปเดตประวัติ
         
+        // 1. ผสานข้อมูลเข้าตัวแปรเงียบๆ เบื้องหลัง
+        data = preserveUIState(data, cloudData);
+        lastSavedDataStr = cloudStr; 
+        
+        // 2. อัปเดตแค่เมนูด้านซ้าย (ให้เห็นว่ามีแฟ้มใหม่) โดยไม่กวนพื้นที่ตรงกลาง
         renderSidebar();
-        renderContent();
-        toast("⚡ อัปเดตข้อมูลล่าสุดจากหน้าจออื่นแล้ว!");
+        
+        // 3. เช็กว่าตอนนี้กำลัง "เปิดจดสรุป" อยู่หรือไม่?
+        const unit = currentUnit();
+        const isEditing = unit && unit._openItem;
+
+        if (!isEditing) {
+          // ถ้าอยู่หน้า "รวมแฟ้ม (แดชบอร์ด)" รีเฟรชตรงกลางได้เลย จะได้เห็นชีทที่เพื่อนเพิ่งสร้าง
+          renderContent();
+        } else {
+          // 🚫 ถ้ากำลัง "จดสรุป" อยู่ ห้ามใช้ renderContent() เด็ดขาด! 
+          // ปล่อยให้มันเซฟข้อมูลเงียบๆ ไป ไม่ต้องเด้ง ไม่ต้องแจ้งเตือนกวนใจ
+          console.log("☁️ ซิงค์ข้อมูลพื้นหลังสำเร็จ (ไม่รบกวนผู้ใช้)");
+        }
       }
     }
   });

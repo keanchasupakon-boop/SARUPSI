@@ -1376,6 +1376,12 @@
         <h1 id="crumbTitle">Welcome</h1>
       </div>
       
+      <!-- 🟢 โค้ดปุ่มสัญญาณ Live Sync -->
+      <div id="syncStatusBadge" title="สถานะการเชื่อมต่อ Cloud" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; background:var(--paper-raised); border:1px solid var(--paper-line); font-size:12px; font-weight:600; color:var(--text-soft); transition:0.3s; margin-right:8px;">
+        <span id="syncDot" style="width:8px; height:8px; border-radius:50%; background:#f59e0b; box-shadow:0 0 6px rgba(245,158,11,0.5);"></span>
+        <span id="syncText">Connecting...</span>
+      </div>
+
       <button class="topbtn" id="pomoBtn" title="Pomodoro Focus Mode" style="font-family:'JetBrains Mono',monospace;">🍅 25:00</button>
       <button class="topbtn" id="themeBtn" title="Toggle Dark Mode">🌙</button>
       <div class="search-wrap">
@@ -1392,18 +1398,16 @@
 <div id="modalRoot"></div>
 <div class="toast" id="toast"></div>
 
-<!-- 📦 1. นำเข้าไลบรารีของ Firebase (ใช้เวอร์ชัน Compat เพื่อไม่ให้กระทบโค้ดแอปเดิม) -->
+<!-- 📦 1. นำเข้าไลบรารีของ Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script> 
 
 <script>
 /* ================= FIREBASE SETUP ================= */
-// 🔑 2. วางกุญแจ Config ที่ได้มา
 const firebaseConfig = {
   apiKey: "AIzaSyAIi_MoPjO_TE9CJCbQ_6bVDdh-crpIHrM",
   authDomain: "sukisarupsi.firebaseapp.com",
-  databaseURL: "https://sukisarupsi-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "sukisarupsi",
   storageBucket: "sukisarupsi.firebasestorage.app",
   messagingSenderId: "814402516659",
@@ -1414,7 +1418,7 @@ const firebaseConfig = {
 // 🚀 3. สั่งปลุก Firebase ให้เริ่มทำงาน
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
-const db = firebase.database();
+const db = firebase.firestore(); 
 
 /* ================= STATE ================= */
 let data = { years: [] };
@@ -1533,20 +1537,27 @@ function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
 
 // ---------------- วางโค้ดใหม่ตรงนี้เลยครับ ----------------
 
-// 🛠️ 0. ฟังก์ชันซ่อมแซมข้อมูลจาก Firebase (ดักบั๊ก Array กลายเป็น Object)
+// 🛠️ 0. ฟังก์ชันซ่อมแซมข้อมูลจาก Firebase (ดักบั๊ก Array กลายเป็น Object และกรองค่า null ทิ้ง)
 function sanitizeData(d) {
   if (!d) return { years: [] };
   if (!d.years) d.years = [];
   if (!Array.isArray(d.years)) d.years = Object.values(d.years);
+  d.years = d.years.filter(y => y !== null && y !== undefined); // ลบ null ที่เกิดจาก Firebase
+  
   d.years.forEach(y => {
     if (!y.subjects) y.subjects = [];
     if (!Array.isArray(y.subjects)) y.subjects = Object.values(y.subjects);
+    y.subjects = y.subjects.filter(s => s !== null && s !== undefined);
+    
     y.subjects.forEach(s => {
       if (!s.units) s.units = [];
       if (!Array.isArray(s.units)) s.units = Object.values(s.units);
+      s.units = s.units.filter(u => u !== null && u !== undefined);
+      
       s.units.forEach(u => {
         if (!u.summaries) u.summaries = [];
         if (!Array.isArray(u.summaries)) u.summaries = Object.values(u.summaries);
+        u.summaries = u.summaries.filter(sum => sum !== null && sum !== undefined);
       });
     });
   });
@@ -1683,7 +1694,7 @@ function renderSidebar(){
       };
 
       const unitWrap = sEl.querySelector('.units');
-      s.units.forEach(u=>{
+      (s.units || []).forEach(u=>{
         const uEl = document.createElement('div');
         uEl.className = 'unit-item' + (u.id===sel.unitId?' active':'');
         uEl.innerHTML = `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(u.name)}</span>
@@ -1721,7 +1732,7 @@ uEl.addEventListener('click', e=>{
     const addSubBtn = document.createElement('button');
     addSubBtn.className='add-row'; addSubBtn.innerHTML='+ สร้างวิชาใหม่';
     addSubBtn.onclick = e=>{ e.stopPropagation();
-      openModal({title:'สร้างวิชาใหม่', fields:[{name:'name',label:'ชื่อวิชา',placeholder:'เช่น Organic Chemistry'},{name:'color',label:'สีประจำวิชา',type:'color',value:SUBJECT_COLORS[y.subjects.length%SUBJECT_COLORS.length]}], submitLabel:'สร้าง',
+      openModal({title:'สร้างวิชาใหม่', fields:[{name:'name',label:'ชื่อวิชา',placeholder:'เช่น Organic Chemistry'},{name:'color',label:'สีประจำวิชา',type:'color',value:SUBJECT_COLORS[(y.subjects||[]).length%SUBJECT_COLORS.length]}], submitLabel:'สร้าง',
         onSubmit:v=>{ if(v.name.trim()){ const ns={id:uid(),name:v.name.trim(),color:v.color,open:true,units:[]}; y.subjects.push(ns);
           sel.yearId=y.id; sel.subjectId=ns.id; sel.unitId=null; y.open=true; renderAll(); toast('สร้างสำเร็จ'); } else {toast('โปรดใส่ชื่อด้วยครับ');}}});
     };
@@ -1757,7 +1768,7 @@ if(!unit){
     if (!year) {
       eyebrow.textContent = 'SARUPSI Dashboard'; title.innerHTML = '📂 หน้าหลัก (แฟ้มทั้งหมด)';
       html += `<div class="folder-card" id="addYearCard"><div class="folder-icon folder-add">+</div><div class="folder-name" style="color:var(--text-soft);">+ สร้างเทอมใหม่</div></div>`;
-      data.years.forEach(y => {
+      (data.years || []).forEach(y => {
         html += `
           <div class="folder-card" data-nav-year="${y.id}">
             <div class="folder-icon" style="background:var(--ink-700);">
@@ -1766,7 +1777,7 @@ if(!unit){
                 <button class="folder-btn del-btn" title="ลบ" data-del-y="${y.id}">✕</button>
               </div>
             </div>
-            <div class="folder-name">${escapeHtml(y.name)}</div><div class="folder-meta">${y.subjects.length} วิชา</div>
+            <div class="folder-name">${escapeHtml(y.name)}</div><div class="folder-meta">${(y.subjects||[]).length} วิชา</div>
           </div>`;
       });
     } 
@@ -1774,7 +1785,7 @@ if(!unit){
 else if (!subj) {
   eyebrow.textContent = 'SARUPSI  ›  ' + year.name; title.innerHTML = `<button onclick="checkUnsaved(()=>{ sel.yearId=null; renderAll(); })" class="topbtn" style="padding:4px 10px; margin-right:12px; border-radius:8px;">← กลับ</button> 📂 วิชาทั้งหมดใน ${escapeHtml(year.name)}`;
       html += `<div class="folder-card" id="addSubjCard"><div class="folder-icon folder-add">+</div><div class="folder-name" style="color:var(--text-soft);">+ สร้างวิชาใหม่</div></div>`;
-      year.subjects.forEach(s => {
+      (year.subjects || []).forEach(s => {
         html += `
           <div class="folder-card" data-nav-subj="${s.id}">
             <div class="folder-icon" style="background:${s.color};">
@@ -1783,7 +1794,7 @@ else if (!subj) {
                 <button class="folder-btn del-btn" title="ลบ" data-del-s="${s.id}">✕</button>
               </div>
             </div>
-            <div class="folder-name">${escapeHtml(s.name)}</div><div class="folder-meta">${s.units.length} บทเรียน</div>
+            <div class="folder-name">${escapeHtml(s.name)}</div><div class="folder-meta">${(s.units||[]).length} บทเรียน</div>
           </div>`;
       });
     } 
@@ -1791,7 +1802,7 @@ else if (!subj) {
 else {
   eyebrow.textContent = `${year.name}  ›  ${subj.name}`; title.innerHTML = `<button onclick="checkUnsaved(()=>{ sel.subjectId=null; renderAll(); })" class="topbtn" style="padding:4px 10px; margin-right:12px; border-radius:8px;">← กลับ</button> 📂 บทเรียนใน ${escapeHtml(subj.name)}`;
       html += `<div class="folder-card" id="addUnitCard"><div class="folder-icon folder-add">+</div><div class="folder-name" style="color:var(--text-soft);">+ สร้างบทเรียน</div></div>`;
-      subj.units.forEach(u => {
+      (subj.units || []).forEach(u => {
         html += `
           <div class="folder-card" data-nav-unit="${u.id}">
             <div class="folder-icon" style="background:${subj.color}; filter:brightness(1.15);">
@@ -1800,7 +1811,7 @@ else {
                 <button class="folder-btn del-btn" title="ลบ" data-del-u="${u.id}">✕</button>
               </div>
             </div>
-            <div class="folder-name">${escapeHtml(u.name)}</div><div class="folder-meta">${u.summaries.length} สรุป</div>
+            <div class="folder-name">${escapeHtml(u.name)}</div><div class="folder-meta">${(u.summaries||[]).length} สรุป</div>
           </div>`;
       });
     }
@@ -1809,7 +1820,7 @@ else {
 
   // --- ผูกฟังก์ชัน (Event Bindings) ให้กดได้แบบลื่นๆ ---
     if(document.getElementById('addYearCard')) document.getElementById('addYearCard').onclick = () => openModal({title:'สร้างเทอมใหม่', fields:[{name:'name',label:'ชื่อเทอม',placeholder:'เช่น ปี 2 เทอม 1'}], submitLabel:'สร้าง', onSubmit:v=>{ if(v.name.trim()){ data.years.push({id:uid(),name:v.name.trim(),open:true,subjects:[]}); sel.yearId=data.years[data.years.length-1].id; sel.subjectId=null; sel.unitId=null; renderAll(); toast('สร้างสำเร็จ!');} else {toast('กรุณาตั้งชื่อด้วยครับ');}}});
-    if(document.getElementById('addSubjCard')) document.getElementById('addSubjCard').onclick = () => openModal({title:'สร้างวิชาใหม่', fields:[{name:'name',label:'ชื่อวิชา',placeholder:'เช่น Organic Chemistry'},{name:'color',label:'สีประจำวิชา',type:'color',value:SUBJECT_COLORS[year.subjects.length%SUBJECT_COLORS.length]}], submitLabel:'สร้าง', onSubmit:v=>{ if(v.name.trim()){ year.subjects.push({id:uid(),name:v.name.trim(),color:v.color,open:true,units:[]}); sel.yearId=year.id; sel.subjectId=year.subjects[year.subjects.length-1].id; sel.unitId=null; year.open=true; renderAll(); toast('สร้างสำเร็จ!');} else {toast('กรุณาตั้งชื่อด้วยครับ');}}});
+    if(document.getElementById('addSubjCard')) document.getElementById('addSubjCard').onclick = () => openModal({title:'สร้างวิชาใหม่', fields:[{name:'name',label:'ชื่อวิชา',placeholder:'เช่น Organic Chemistry'},{name:'color',label:'สีประจำวิชา',type:'color',value:SUBJECT_COLORS[(year.subjects||[]).length%SUBJECT_COLORS.length]}], submitLabel:'สร้าง', onSubmit:v=>{ if(v.name.trim()){ year.subjects.push({id:uid(),name:v.name.trim(),color:v.color,open:true,units:[]}); sel.yearId=year.id; sel.subjectId=year.subjects[year.subjects.length-1].id; sel.unitId=null; year.open=true; renderAll(); toast('สร้างสำเร็จ!');} else {toast('กรุณาตั้งชื่อด้วยครับ');}}});
     if(document.getElementById('addUnitCard')) document.getElementById('addUnitCard').onclick = () => openModal({title:'สร้างบทเรียนใหม่', fields:[{name:'name',label:'ชื่อบทเรียน',placeholder:'เช่น บทที่ 1 - บทนำ'}], submitLabel:'สร้าง', onSubmit:v=>{ if(v.name.trim()){ subj.units.push({id:uid(),name:v.name.trim(),summaries:[]}); sel.yearId=year.id; sel.subjectId=subj.id; sel.unitId=subj.units[subj.units.length-1].id; subj.open=true; year.open=true; renderAll(); toast('สร้างสำเร็จ!');} else {toast('กรุณาตั้งชื่อด้วยครับ');}}});
 
 c.querySelectorAll('[data-nav-year]').forEach(el => el.onclick = (e) => { if(e.target.closest('.folder-btn')) return; checkUnsaved(()=>{ sel.yearId=el.dataset.navYear; sel.subjectId=null; sel.unitId=null; renderAll(); }); });
@@ -1833,7 +1844,7 @@ eyebrow.textContent = `${year.name}  ·  ${subj.name}`;
 
   // 🌟 ฝังคำสั่ง handleTypeTabClick ลงไปในปุ่มเลย รับรองไม่มีทางหลุด!
   const typeTabs = TYPES.map(t=>{
-    const count = unit.summaries.filter(s=>s.type===t.key).length;
+    const count = (unit.summaries || []).filter(s=>s.type===t.key).length;
     return `<button class="type-tab ${sel.type===t.key?'active':''}" onclick="handleTypeTabClick('${t.key}')">
       <span class="tico">${t.icon}</span> ${t.label} ${count?`<span style="opacity:.55">· ${count}</span>`:''}
     </button>`;
@@ -1856,7 +1867,7 @@ window.handleTypeTabClick = function(targetType) {
 function renderTypePanel(unit){
   const panel = document.getElementById('typePanel');
   const meta = TYPES.find(t=>t.key===sel.type);
-  const items = unit.summaries.filter(s=>s.type===sel.type);
+  const items = (unit.summaries || []).filter(s=>s.type===sel.type);
 
   // วาดแถบ Toolbar และปุ่ม + New
   panel.innerHTML = `
@@ -1928,7 +1939,7 @@ function createSummary(unit, type){
   let counter = 1;
   
   // ดึงชื่อไฟล์ทั้งหมดใน unit นี้มาเช็ก
-  const existingTitles = unit.summaries.map(s => s.title);
+  const existingTitles = (unit.summaries || []).map(s => s.title);
   
   // วนลูปหาชื่อที่ยังไม่ซ้ำ
   while (existingTitles.includes(newTitle)) {
@@ -1941,10 +1952,11 @@ function createSummary(unit, type){
   
   if(type==='note') item.content = '';
   if(type==='cornell') item.content = { pages: [{ id: uid(), sections: [{ id: uid(), cues: [{id:uid(), text:''}], notes: '' }], summary: '' }] };
-  if(type==='mindmap') item.content = {nodes:[{id:'r', text:unit.name, x:900, y:120, color:0, parentId:null, root:true}]};
+  if(type==='mindmap') item.content = {nodes:[{id:'r', text:unit.name||'หัวข้อหลัก', x:900, y:120, color:0, parentId:null, root:true}]};
   if(type==='flashcard') item.content = {cards:[]};
   if(type==='outline') item.content = {items:[{id:uid(), text:'', level:0}]};
   
+  if(!unit.summaries) unit.summaries = [];
   unit.summaries.push(item);
   
 // 3. ครอบด้วย checkUnsaved เผื่อว่ากำลังเปิดไฟล์อื่นที่ลืมเซฟอยู่
@@ -1960,7 +1972,7 @@ function renderEditor(unit, item){
   const meta = TYPES.find(t=>t.key===item.type);
   
   // 1. [UX FIX] สร้าง Tabs ให้ "ทุกประเภทไฟล์" ไม่ใช่แค่ Note ธรรมดาอีกต่อไป
-  const siblingFiles = unit.summaries.filter(s => s.type === item.type);
+  const siblingFiles = (unit.summaries || []).filter(s => s.type === item.type);
   let tabsHtml = '';
   if (siblingFiles.length > 0) {
     tabsHtml = `<div class="editor-tabs">` + siblingFiles.map(s => `
@@ -2383,9 +2395,10 @@ function renderNoteEditor(item){
     let answer = prompt(`สร้างการ์ดจากคำถาม: "${selection}"\nกรุณาพิมพ์ "คำตอบ":`);
     if(answer) {
       const unit = currentUnit();
-      let fcItem = unit.summaries.find(s => s.type === 'flashcard');
+      let fcItem = (unit.summaries||[]).find(s => s.type === 'flashcard');
       if(!fcItem) {
         fcItem = {id:uid(), type:'flashcard', title:'Auto-generated Cards', content:{cards:[]}, updatedAt:now()};
+        if(!unit.summaries) unit.summaries = [];
         unit.summaries.push(fcItem);
       }
       fcItem.content.cards.push({ id:uid(), front: selection, back: answer, reps: 0, ease: 2.5, interval: 0, nextReview: now() });
@@ -2415,7 +2428,7 @@ function renderMindmapEditor(item){
   
   const canvas = document.getElementById('mmCanvas');
   const viewport = document.getElementById('mmViewport');
-  let selectedNode = item.content.nodes.find(n=>n.root) ? item.content.nodes[0].id : null;
+  let selectedNode = (item.content.nodes||[]).find(n=>n.root) ? item.content.nodes[0].id : null;
   
   let zoomLevel = 1;
   const updateZoom = () => { canvas.style.transform = `scale(${zoomLevel})`; canvas.style.transformOrigin = '0 0'; document.getElementById('mmZoomVal').innerText = Math.round(zoomLevel*100)+'%'; };
@@ -2439,7 +2452,7 @@ function renderMindmapEditor(item){
 
   // --- 1. ฟังก์ชันจัดระเบียบอัตโนมัติ (Auto-Layout Core) ---
   function applyAutoLayout() {
-    const root = item.content.nodes.find(n => n.root);
+    const root = (item.content.nodes||[]).find(n => n.root);
     if(!root) return;
     const gapX = 240; const gapY = 60;
     function calcHeight(nodeId) {
@@ -2462,7 +2475,7 @@ function renderMindmapEditor(item){
 
   // --- 2. ฟังก์ชันกล้องวิ่งตาม (Auto-Pan / Center Camera) ---
   function focusNode(nodeId) {
-    const node = item.content.nodes.find(n => n.id === nodeId);
+    const node = (item.content.nodes||[]).find(n => n.id === nodeId);
     if(!node) return;
     // คำนวณหาจุดกึ่งกลางของหน้าจอ
     const targetX = (node.x * zoomLevel) - (viewport.clientWidth / 2) + 120; // 120 คือ offset เผื่อความกว้างโหนด
@@ -2471,15 +2484,16 @@ function renderMindmapEditor(item){
   }
 
   document.getElementById('mmCenter').onclick = () => {
-    const root = item.content.nodes.find(n => n.root);
+    const root = (item.content.nodes||[]).find(n => n.root);
     if(root) focusNode(root.id);
   };
   document.getElementById('mmAddRoot').onclick = () => {
-    if(item.content.nodes.length > 0) { toast("มีหัวข้อหลักอยู่แล้วครับ! ให้แตกกิ่งย่อยแทนนะ"); return; }
+    if((item.content.nodes||[]).length > 0) { toast("มีหัวข้อหลักอยู่แล้วครับ! ให้แตกกิ่งย่อยแทนนะ"); return; }
     addChildNode(null);
   };
 
   function addChildNode(parentId){
+    if(!item.content.nodes) item.content.nodes = [];
     const base = parentId ? item.content.nodes.find(n=>n.id===parentId) : null;
     if(base && base.collapsed) base.collapsed = false; // กางกิ่งแม่ก่อนเพิ่มลูก
     
@@ -2502,7 +2516,7 @@ function renderMindmapEditor(item){
   function isVisible(node) {
     let curr = node;
     while(curr.parentId) {
-      let p = item.content.nodes.find(n => n.id === curr.parentId);
+      let p = (item.content.nodes||[]).find(n => n.id === curr.parentId);
       if(!p) break;
       if(p.collapsed) return false;
       curr = p;
@@ -2512,7 +2526,7 @@ function renderMindmapEditor(item){
 
   function draw(){
     canvas.querySelectorAll('.mm-node').forEach(n=>n.remove());
-    const visibleNodes = item.content.nodes.filter(n => isVisible(n));
+    const visibleNodes = (item.content.nodes||[]).filter(n => isVisible(n));
 
     visibleNodes.forEach(node=>{
       const el = document.createElement('div');
@@ -2523,7 +2537,7 @@ function renderMindmapEditor(item){
       
       const displayText = node.text === '' ? '<span style="color:rgba(0,0,0,0.3);">พิมพ์หัวข้อ...</span>' : escapeHtml(node.text);
       
-      const kids = item.content.nodes.filter(n => n.parentId === node.id);
+      const kids = (item.content.nodes||[]).filter(n => n.parentId === node.id);
       let collapseBtnHtml = '';
       if(kids.length > 0) {
         collapseBtnHtml = `<div class="mm-collapse-btn" data-act="collapse" title="ยุบ/ขยายกิ่ง">${node.collapsed ? kids.length : '−'}</div>`;
@@ -2643,7 +2657,7 @@ function renderMindmapEditor(item){
       const delBtn = el.querySelector('[data-act="del"]');
       if(delBtn) delBtn.onclick = e=>{ 
         e.stopPropagation(); 
-        const kids = item.content.nodes.filter(n=>n.parentId===node.id);
+        const kids = (item.content.nodes||[]).filter(n=>n.parentId===node.id);
         if(kids.length > 0) {
             openModal({title:'ลบกิ่งนี้ทิ้ง?', msg:`กิ่งย่อยทั้งหมดจะหายไปถาวร!`, danger:true, submitLabel:'ลบ', onSubmit:()=>{ deleteSubtree(node.id); applyAutoLayout(); draw(); }});
         } else { deleteSubtree(node.id); applyAutoLayout(); draw(); focusNode(node.parentId); }
@@ -2654,9 +2668,9 @@ function renderMindmapEditor(item){
   }
 
   function deleteSubtree(id){
-    const kids = item.content.nodes.filter(n=>n.parentId===id).map(n=>n.id);
+    const kids = (item.content.nodes||[]).filter(n=>n.parentId===id).map(n=>n.id);
     kids.forEach(k=>deleteSubtree(k));
-    item.content.nodes = item.content.nodes.filter(n=>n.id!==id);
+    item.content.nodes = (item.content.nodes||[]).filter(n=>n.id!==id);
     item.updatedAt = now();
   }
 
@@ -2683,13 +2697,13 @@ function renderMindmapEditor(item){
     });
   }
   
-  if(item.content.nodes.length===0) { addChildNode(null); } 
+  if((item.content.nodes||[]).length===0) { addChildNode(null); } 
   else { 
       // โหลดไฟล์เก่าปุ๊บ จัดระเบียบและเล็งกล้องไปที่ Root ทันที
       applyAutoLayout(); 
       draw(); 
       setTimeout(()=> { 
-        const root = item.content.nodes.find(n => n.root);
+        const root = (item.content.nodes||[]).find(n => n.root);
         if(root) focusNode(root.id);
       }, 100);
   }
@@ -2885,7 +2899,7 @@ function renderOutlineEditor(item){
     rows.innerHTML = '';
     let skipLevel = -1; 
     
-    item.content.items.forEach((line, idx) => {
+    (item.content.items || []).forEach((line, idx) => {
       if(line.collapsed === undefined) line.collapsed = false;
       if(line.isTask === undefined) line.isTask = false;
       if(line.checked === undefined) line.checked = false;
@@ -2896,7 +2910,7 @@ function renderOutlineEditor(item){
       }
       if (line.collapsed) skipLevel = line.level;
 
-      const nextLine = item.content.items[idx + 1];
+      const nextLine = (item.content.items||[])[idx + 1];
       const hasChildren = nextLine && nextLine.level > line.level; 
 
       const row = document.createElement('div');
@@ -2979,7 +2993,7 @@ function renderOutlineEditor(item){
         }
         if(e.key === 'Backspace' && inp.innerText.trim() === '') {
            e.preventDefault();
-           if(item.content.items.length > 1) {
+           if((item.content.items||[]).length > 1) {
                item.content.items.splice(idx, 1); item.updatedAt=now(); draw(); focusRow(Math.max(0, idx - 1));
            }
         }
@@ -2995,13 +3009,14 @@ function renderOutlineEditor(item){
       row.querySelector('[data-act="task"]').onclick = () => { line.isTask = !line.isTask; item.updatedAt=now(); draw(); };
       row.querySelector('[data-act="out"]').onclick = () => { line.level = Math.max(0, line.level - 1); item.updatedAt=now(); draw(); focusRow(idx); };
       row.querySelector('[data-act="in"]').onclick = () => { line.level = Math.min(6, line.level + 1); item.updatedAt=now(); draw(); focusRow(idx); };
-      row.querySelector('[data-act="del"]').onclick = () => { if(item.content.items.length > 1) { item.content.items.splice(idx, 1); item.updatedAt=now(); draw(); } };
+      row.querySelector('[data-act="del"]').onclick = () => { if((item.content.items||[]).length > 1) { item.content.items.splice(idx, 1); item.updatedAt=now(); draw(); } };
 
       rows.appendChild(row);
     });
   }
 
   function insertAfter(idx, level){
+    if(!item.content.items) item.content.items = [];
     item.content.items.splice(idx+1,0,{id:uid(), text:'', level: level, collapsed:false, isTask:false, checked:false});
     item.updatedAt=now(); draw(); focusRow(idx+1);
   }
@@ -3010,12 +3025,12 @@ function renderOutlineEditor(item){
     setTimeout(()=>{ const el = rows.querySelector(`.ol-row[data-idx="${idx}"] .ol-text`); if(el) el.focus(); }, 50);
   }
 
-  document.getElementById('olAdd').onclick = ()=> insertAfter(item.content.items.length-1, 0);
+  document.getElementById('olAdd').onclick = ()=> insertAfter((item.content.items||[]).length-1, 0);
   
   // ลบ Task ที่เสร็จแล้ว
   document.getElementById('olClearChecked').onclick = () => {
-    const beforeCount = item.content.items.length;
-    item.content.items = item.content.items.filter(i => !i.checked);
+    const beforeCount = (item.content.items||[]).length;
+    item.content.items = (item.content.items||[]).filter(i => !i.checked);
     if(item.content.items.length === 0) item.content.items.push({id:uid(), text:'', level:0}); // กันไม่ให้โล่ง
     if(beforeCount > item.content.items.length) { item.updatedAt=now(); draw(); toast("ลบ Task ที่เสร็จแล้วเรียบร้อย! 🧹"); }
     else { toast("ไม่มี Task ที่ขีดฆ่าให้ลบครับ"); }
@@ -3076,7 +3091,7 @@ document.getElementById('importInput').addEventListener('change', e=>{
 /* ================= INIT & AUTO-RESUME ================= */
 // 1. โหลดข้อมูล (Data) และหน้าล่าสุด (Auto-Resume) จากเบราว์เซอร์
 const savedData = localStorage.getItem('sarupsi_data');
-if(savedData) { try { data = JSON.parse(savedData); } catch(e) {} }
+if(savedData) { try { data = sanitizeData(JSON.parse(savedData)); } catch(e) {} }
 
 const savedSel = localStorage.getItem('sarupsi_sel');
 if(savedSel) {
@@ -3168,7 +3183,7 @@ document.addEventListener('keydown', e => {
   if (e.ctrlKey && e.key === 'd') { e.preventDefault(); toggleTheme(); }
 });
 
-// 5. Auto Backup ทุก 3 นาที (เซฟข้อมูลทุกอย่าง)
+// 5. Auto Backup ทุก 3 นาที (เซฟข้อมูลลงเครื่อง)
 setInterval(() => {
   localStorage.setItem('sarupsi_data', JSON.stringify(data));
   localStorage.setItem('sarupsi_sel', JSON.stringify(sel));
@@ -3178,50 +3193,94 @@ setInterval(() => {
 /* =========================================================
    ☁️ AUTHENTICATION LOGIC & CLOUD SYNC (FIREBASE)
 ========================================================= */
-// ดึงแค่ข้อมูลบัญชีที่ให้เครื่องนี้จำไว้ (ไม่ Sync ข้ามเครื่อง)
-let savedLogins = JSON.parse(localStorage.getItem('sarupsi_saved_logins')) || [];
+let savedLogins = [];
+try { savedLogins = JSON.parse(localStorage.getItem('sarupsi_saved_logins')) || []; } catch(e){}
 let activeUser = null; 
+let lastSavedDataStr = ""; 
 
 document.getElementById('app').style.display = 'none';
 
-// ==========================================
-// ⚡ REAL-TIME CLOUD SYNC & AUTO-SAVE (ระบบเซฟอัตโนมัติ + เด้งข้ามจอ)
-// ==========================================
-let lastSavedDataStr = ""; // ตัวช่วยเช็กว่าข้อมูลล่าสุดตรงกับคลาวด์ไหม
+// 🌟 ดึงหน้า UI ล็อกอินมารอไว้เลย ไม่ต้องรอ Firebase (แก้บั๊กจอขาวตอนเริ่ม)
+document.getElementById('authSubtitle').innerText = 'กำลังตรวจสอบสถานะ...';
+if (savedLogins.length > 0) { switchAuthView('profiles'); renderSavedProfiles(); } 
+else { switchAuthView('login'); }
 
-// 1. 📡 ตัวรับสัญญาณ Cloud: ใครล็อกอินอยู่ ให้โหลดข้อมูลลงมา
+// 📡 ฟังก์ชันควบคุมสีปุ่มสัญญาณ (แดง / เหลือง / เขียว)
+function updateSyncStatus(status) {
+  const badge = document.getElementById('syncStatusBadge');
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncText');
+  if(!badge || !dot || !txt) return;
+
+  if(status === 'online') {
+    dot.style.background = '#10b981'; 
+    dot.style.boxShadow = '0 0 8px rgba(16,185,129,0.5)';
+    txt.innerText = 'Live Synced';
+    txt.style.color = '#10b981';
+    badge.style.borderColor = 'rgba(16,185,129,0.3)';
+    badge.style.background = 'rgba(16,185,129,0.05)';
+  } else if(status === 'offline' || status === 'error') {
+    dot.style.background = '#ef4444'; 
+    dot.style.boxShadow = '0 0 8px rgba(239,68,68,0.5)';
+    txt.innerText = 'Offline';
+    txt.style.color = '#ef4444';
+    badge.style.borderColor = 'rgba(239,68,68,0.3)';
+    badge.style.background = 'rgba(239,68,68,0.05)';
+  } else {
+    dot.style.background = '#f59e0b'; 
+    dot.style.boxShadow = '0 0 8px rgba(245,158,11,0.5)';
+    txt.innerText = 'Syncing...';
+    txt.style.color = '#f59e0b';
+    badge.style.borderColor = 'var(--paper-line)';
+    badge.style.background = 'var(--paper-raised)';
+  }
+}
+
+// 1. 📡 ตัวรับสัญญาณ Cloud (ตอนล็อกอิน)
 auth.onAuthStateChanged((user) => {
   if (user) {
-    db.ref('users/' + user.uid + '/profile').once('value').then(snap => {
-      activeUser = snap.val();
-      if(!activeUser) return;
+    db.collection('profiles').doc(user.uid).get().then(snap => {
+      // ระบบฟื้นฟูอัตโนมัติ สำหรับยูสเซอร์เก่า
+      if (snap.exists) {
+        activeUser = snap.data();
+      } else {
+        const fallbackId = user.email.split('@')[0];
+        activeUser = {
+            id: fallbackId,
+            name: 'User ' + fallbackId,
+            avatar: `https://api.dicebear.com/7.x/micah/svg?seed=${fallbackId}&backgroundColor=fdfbf7`
+        };
+        db.collection('profiles').doc(user.uid).set(activeUser);
+      }
       
       document.getElementById('appUserName').innerText = activeUser.name;
       document.getElementById('appUserId').innerText = "ID: " + activeUser.id;
       document.getElementById('appUserAvatar').src = activeUser.avatar;
 
-      db.ref('users/' + user.uid + '/data').once('value').then(dataSnap => {
-        let cloudData = dataSnap.val();
+      db.collection('userData').doc(user.uid).get().then(dataSnap => {
+        let cloudData = dataSnap.exists ? dataSnap.data().data : null;
         
-        // 🛑 แก้บั๊ก "ลบหมดแล้วเด้งกลับมาใหม่" (Firebase ไม่เก็บ Array ว่าง)
-if (cloudData !== null) {
-          data = sanitizeData(cloudData); // 🌟 ซ่อมแซมและจัดระเบียบข้อมูลทันทีที่โหลดมา
+        if (cloudData !== null) {
+          data = sanitizeData(cloudData);
         } else {
-          // ถ้าเป็น null แปลว่าเพิ่งสมัครใหม่จริงๆ
           data = { years: [] }; seed(); 
-          db.ref('users/' + user.uid + '/data').set(data); // แอบเซฟไฟล์ Tutorial ขึ้น Cloud ไปเลย
+          db.collection('userData').doc(user.uid).set({ data: data });
         }
         
-        // จำรอยประทับของข้อมูลล่าสุดไว้ (จะได้รู้ว่ามีการแก้ไขใหม่หรือยัง)
         lastSavedDataStr = JSON.stringify(data);
         
         document.getElementById('authScreen').style.display = 'none';
         document.getElementById('app').style.display = window.innerWidth <= 760 ? 'block' : 'grid';
         renderAll();
         
-        // เปิดหูฟังระบบ Live Sync
         setupRealtimeSync(user.uid);
+      }).catch(err => {
+        showAuthMsg('ดึงข้อมูลสรุปไม่สำเร็จ: ' + err.message, 'error');
       });
+
+    }).catch(err => {
+      showAuthMsg('ไม่สามารถเข้าถึง Firestore ได้: ' + err.message, 'error');
+      console.error("Firestore Error: ", err);
     });
   } else {
     activeUser = null;
@@ -3232,51 +3291,46 @@ if (cloudData !== null) {
   }
 });
 
-// 2. 💾 ระบบปุ่มบันทึก (Manual Save) แบบรับประกันข้อมูลครบ 100%
+// 2. 💾 ระบบปุ่มบันทึก (Manual Save) 
 function manualSave() {
   if (!auth.currentUser || !data) { toast("⚠️ กรุณาเข้าสู่ระบบก่อนบันทึก"); return; }
   
   const saveBtn = document.getElementById('saveCloudBtn');
-  
-  // เปลี่ยนหน้าตาปุ่ม "ทันที" ไม่ต้องรอเน็ต! (ให้ผู้ใช้อุ่นใจ)
-  if(saveBtn) { saveBtn.innerText = '✅ บันทึกแล้ว'; saveBtn.style.opacity = '1'; }
-  toast("💾 บันทึกข้อมูลเรียบร้อย!");
-  hasUnsavedChanges = false; // รีเซ็ตสถานะหลังกดบันทึก
-  
-  // 💡 ทริคแก้ปัญหา: รอ 0.5 วินาที ให้ระบบจดสรุปรวบรวมตัวอักษรล่าสุดลงตัวแปรให้เสร็จก่อน แล้วค่อยส่งขึ้น Cloud
+  if(saveBtn) { saveBtn.innerText = '⏳ กำลังบันทึก...'; saveBtn.style.opacity = '0.7'; }
+  updateSyncStatus('connecting'); // เปลี่ยนไฟเป็นสีเหลือง
+
   setTimeout(() => {
     const currentDataStr = JSON.stringify(data);
-    
-    db.ref('users/' + auth.currentUser.uid + '/data').set(data).then(() => {
-       lastSavedDataStr = currentDataStr; // อัปเดตข้อมูลล่าสุด
+    db.collection('userData').doc(auth.currentUser.uid).set({ data: data }).then(() => {
+       lastSavedDataStr = currentDataStr; 
        localStorage.setItem('sarupsi_sel', JSON.stringify(sel));
-       
-       // ผ่านไป 3 วินาที คืนปุ่มกลับสู่สภาพเดิม
+       hasUnsavedChanges = false; 
+       updateSyncStatus('online'); // ไฟเขียว
+       if(saveBtn) { saveBtn.innerText = '✅ บันทึกแล้ว'; saveBtn.style.opacity = '1'; }
        setTimeout(() => { if(saveBtn) saveBtn.innerText = '💾 บันทึก (Save)'; }, 3000);
     }).catch(err => {
        toast("❌ บันทึกไม่สำเร็จ: " + err.message);
-       if(saveBtn) { saveBtn.innerText = '💾 บันทึก (Save)'; }
+       updateSyncStatus('error'); // ไฟแดง
+       if(saveBtn) { saveBtn.innerText = '💾 บันทึก (Save)'; saveBtn.style.opacity = '1'; }
     });
-  }, 500); // ดีเลย์ 500ms ตรงนี้แหละครับที่เป็นกุญแจสำคัญ!
+  }, 500); 
 }
 
-// 3. 🛡️ ฟังก์ชันแยกหน้าจอ (ป้องกันหน้าต่างกระโดดตามกันเวลาซิงค์)
+// 3. 🛡️ ฟังก์ชันแยกหน้าจอเวลาซิงค์
 function preserveUIState(oldData, newData) {
    if (!oldData || !newData) return newData;
-   if (!newData.years) newData.years = []; // ดัก Firebase ลบ Array ว่าง
+   if (!newData.years) newData.years = []; 
    
-   // ถ่ายโอนสถานะ "การเปิด/ปิด" โฟลเดอร์จากเครื่องเดิม ไปใส่ข้อมูลที่เพิ่งโหลดมา
    newData.years.forEach(newY => {
       const oldY = oldData.years.find(y => y.id === newY.id);
       if (oldY && oldY.open !== undefined) newY.open = oldY.open;
       if (newY.subjects) {
          newY.subjects.forEach(newS => {
-            const oldS = oldY ? oldY.subjects.find(s => s.id === newS.id) : null;
+            const oldS = oldY ? (oldY.subjects||[]).find(s => s.id === newS.id) : null;
             if (oldS && oldS.open !== undefined) newS.open = oldS.open;
             if (newS.units) {
                newS.units.forEach(newU => {
-                  const oldU = oldS ? oldS.units.find(u => u.id === newU.id) : null;
-                  // รักษาให้รู้ว่าเครื่องนี้เปิดไฟล์ไหนค้างไว้
+                  const oldU = oldS ? (oldS.units||[]).find(u => u.id === newU.id) : null;
                   if (oldU && oldU._openItem !== undefined) newU._openItem = oldU._openItem;
                });
             }
@@ -3286,13 +3340,20 @@ function preserveUIState(oldData, newData) {
    return newData;
 }
 
-// 4. ⚡ ระบบซิงค์ข้อมูลสด (อัปเดตเงียบๆ ไม่กระชากหน้าจอ!)
+// 4. ⚡ ระบบซิงค์ข้อมูลสด (Live Updates + Red/Green Signal)
 function setupRealtimeSync(uid) {
-  db.ref('users/' + uid + '/data').on('value', (snapshot) => {
-    let cloudData = snapshot.val();
+  updateSyncStatus('connecting');
+
+  db.collection('userData').doc(uid).onSnapshot({ includeMetadataChanges: true }, (snapshot) => {
+    // อัปเดตสีสัญญาณไฟ
+    if (snapshot.metadata.fromCache) { updateSyncStatus('offline'); } 
+    else { updateSyncStatus('online'); }
+
+    if (!snapshot.exists) return;
     
-    if (cloudData === null) cloudData = { years: [] };
-    cloudData = sanitizeData(cloudData); // 🌟 ซ่อมข้อมูลจากการซิงค์อัตโนมัติ
+    let cloudData = snapshot.data().data;
+    if (!cloudData) cloudData = { years: [] };
+    cloudData = sanitizeData(cloudData);
 
     const cloudStr = JSON.stringify(cloudData);
     const localStr = JSON.stringify(data);
@@ -3302,10 +3363,9 @@ function setupRealtimeSync(uid) {
       const openItemId = unit ? unit._openItem : null;
       const isEditing = !!openItemId;
 
-      // ผสานข้อมูลเข้าตัวแปรเงียบๆ
       let newData = preserveUIState(data, cloudData);
       
-      // ถ้ายูสเซอร์กำลังพิมพ์ไฟล์อยู่ ห้ามเอาข้อมูลคลาวด์มาทับ!
+      // กันคลาวด์ทับข้อมูลที่กำลังพิมพ์
       if (hasUnsavedChanges && openItemId) {
           const oldItem = unit.summaries.find(s => s.id === openItemId);
           newData.years.forEach(y => {
@@ -3314,7 +3374,7 @@ function setupRealtimeSync(uid) {
                       if (u.id === unit.id) {
                           const newIndex = u.summaries.findIndex(sum => sum.id === openItemId);
                           if (newIndex !== -1 && oldItem) {
-                              u.summaries[newIndex] = oldItem; // ทับด้วยสิ่งที่เรากำลังพิมพ์อยู่เป๊ะๆ
+                              u.summaries[newIndex] = oldItem;
                           }
                       }
                   });
@@ -3326,28 +3386,25 @@ function setupRealtimeSync(uid) {
       lastSavedDataStr = JSON.stringify(data);
       renderSidebar(); 
       
-      if (!isEditing) {
-        renderContent();
-      } else {
-        console.log("☁️ ซิงค์ข้อมูลพื้นหลังเรียบร้อย (พิมพ์ต่อได้เลย ไม่สะดุด)");
-      }
+      if (!isEditing) { renderContent(); }
     }
+  }, (error) => {
+    updateSyncStatus('error');
+    console.error("Error listening to Firestore: ", error);
   });
 }
 
-// 5. 🤖 Auto-save กันเหนียวแบบเงียบๆ ทุก 10 วินาที
+// 5. 🤖 Auto-save กันเหนียวแบบเงียบๆ อัปขึ้น Cloud ทุก 10 วินาที
 setInterval(() => {
    if (!auth.currentUser || !data) return;
    const currentDataStr = JSON.stringify(data);
-   // ถ้าพบว่าข้อมูลในเครื่องถูกแก้ไข (แต่ User ลืมกดปุ่มเซฟ) มันจะแอบดันขึ้นคลาวด์ให้เอง
    if (currentDataStr !== lastSavedDataStr) {
-       db.ref('users/' + auth.currentUser.uid + '/data').set(data).then(() => {
+       db.collection('userData').doc(auth.currentUser.uid).set({ data: data }).then(() => {
           lastSavedDataStr = currentDataStr;
        });
    }
 }, 10000);
 
-// (นำฟังก์ชันแจ้งเตือน ระบบล็อกอิน และ Avatar มาใส่คืนด้านล่าง)
 function showAuthMsg(msg, type) {
   const msgBox = document.getElementById('authMsg');
   let icon = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '⏳';
@@ -3394,7 +3451,7 @@ function doRegister() {
   showAuthMsg('กำลังสร้างบัญชีบน Cloud...', 'info');
 
   auth.createUserWithEmailAndPassword(email, pwd)
-    .then((userCred) => { return db.ref('users/' + userCred.user.uid + '/profile').set({ name, id, avatar }); })
+    .then((userCred) => { return db.collection('profiles').doc(userCred.user.uid).set({ name, id, avatar }); })
     .then(() => { showAuthMsg('สมัครสำเร็จ! ยินดีต้อนรับสู่ SARUPSI 🎉', 'success'); })
     .catch((error) => {
       if(error.code === 'auth/email-already-in-use') {
@@ -3415,8 +3472,8 @@ function doLogin() {
   auth.signInWithEmailAndPassword(email, pwd)
     .then((userCred) => {
        showAuthMsg('เข้าสู่ระบบสำเร็จ! กำลังเตรียมข้อมูล...', 'success');
-       db.ref('users/' + userCred.user.uid + '/profile').once('value').then(snap => {
-         const pf = snap.val();
+       db.collection('profiles').doc(userCred.user.uid).get().then(snap => {
+         const pf = snap.exists ? snap.data() : null;
          if(pf && !savedLogins.find(u => u.id === pf.id)) {
            savedLogins.push({ id: pf.id, name: pf.name, avatar: pf.avatar });
            localStorage.setItem('sarupsi_saved_logins', JSON.stringify(savedLogins));
@@ -3436,7 +3493,7 @@ function doLogin() {
 function forgotPassword() {
   const id = document.getElementById('loginId').value.trim();
   if (!id) { showAuthMsg('กรุณากรอกรหัสประจำตัว (ID) ก่อนกดลืมรหัสผ่านครับ 💡', 'warning'); document.getElementById('loginId').focus(); } 
-  else { showAuthMsg(`บัญชี ${id}: เนื่องจากเป็นระบบภายใน กรุณาติดต่อ Admin (SUKI) เพื่อรีเซ็ตรหัสผ่านครับ 🛠️`, 'info'); }
+  else { showAuthMsg(`บัญชี ${id}: เนื่องจากเป็นระบบภายใน กรุณาติดต่อ Admin เพื่อรีเซ็ตรหัสผ่านครับ 🛠️`, 'info'); }
 }
 
 function loginWithProfile(id) {
@@ -3502,7 +3559,7 @@ function openAvatarStudio() {
   
   document.getElementById('saveAvatarBtn').onclick = () => {
      activeUser.avatar = preview.src;
-     db.ref('users/' + auth.currentUser.uid + '/profile').update({ avatar: activeUser.avatar });
+     db.collection('profiles').doc(auth.currentUser.uid).update({ avatar: activeUser.avatar });
      const sIndex = savedLogins.findIndex(u => u.id === activeUser.id);
      if(sIndex !== -1) { savedLogins[sIndex].avatar = activeUser.avatar; localStorage.setItem('sarupsi_saved_logins', JSON.stringify(savedLogins)); }
      document.getElementById('appUserAvatar').src = activeUser.avatar;
@@ -3511,4 +3568,4 @@ function openAvatarStudio() {
 }
 </script>
 </body>
-</html> 
+</html>

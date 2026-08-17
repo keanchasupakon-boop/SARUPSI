@@ -3299,33 +3299,36 @@ auth.onAuthStateChanged((user) => {
   }
 });
 
-// 2. 💾 ระบบปุ่มบันทึก (Manual Save) ทำงานทันที
+// 2. 💾 กรณีที่ 1: ระบบปุ่มบันทึก (Manual Save - บังคับเซฟทันที)
 function manualSave() {
   if (!auth.currentUser || !data) { toast("⚠️ กรุณาเข้าสู่ระบบก่อนบันทึก"); return; }
   
-  clearTimeout(autoSaveTimer); // เคลียร์ตัวนับเวลา auto-save ทิ้งก่อน เพื่อไม่ให้ทำงานซ้อนกัน
+  // 🛑 หยุดการทำงานของ Auto-save ทันทีเพื่อไม่ให้เซฟซ้ำซ้อน
+  clearTimeout(autoSaveTimer); 
   
   const saveBtn = document.getElementById('saveCloudBtn');
   if(saveBtn) { saveBtn.innerText = '⏳ กำลังบันทึก...'; saveBtn.style.opacity = '0.7'; }
-  updateSyncStatus('saving'); // เปลี่ยนไฟเป็นสีฟ้า
+  updateSyncStatus('saving'); // 🔵 เปลี่ยนไฟเป็นสีฟ้า (กำลังบังคับเซฟ)
 
   const currentDataStr = JSON.stringify(data);
   db.collection('userData').doc(auth.currentUser.uid).set({ data: data }).then(() => {
      lastSavedDataStr = currentDataStr; 
      localStorage.setItem('sarupsi_sel', JSON.stringify(sel));
-     hasUnsavedChanges = false; 
-     updateSyncStatus('online'); // ไฟเขียว
+     
+     hasUnsavedChanges = false; // 🟢 ปลดล็อกสถานะ ให้รับข้อมูลใหม่จาก Cloud ได้
+     updateSyncStatus('online'); // 🟢 ไฟเขียว (เซฟเสร็จสมบูรณ์)
+     
      if(saveBtn) { saveBtn.innerText = '✅ บันทึกแล้ว'; saveBtn.style.opacity = '1'; }
      setTimeout(() => { if(saveBtn) saveBtn.innerText = '💾 บันทึก (Save)'; }, 3000);
      toast("💾 บันทึกข้อมูลเรียบร้อย!");
   }).catch(err => {
      toast("❌ บันทึกไม่สำเร็จ: " + err.message);
-     updateSyncStatus('error'); // ไฟแดง
+     updateSyncStatus('error'); // 🔴 ไฟแดง (เกิดข้อผิดพลาด)
      if(saveBtn) { saveBtn.innerText = '💾 บันทึก (Save)'; saveBtn.style.opacity = '1'; }
   });
 }
 
-// 3. 🛡️ ฟังก์ชันแยกหน้าจอเวลาซิงค์
+// 3. 🛡️ ฟังก์ชันแยกหน้าจอเวลาซิงค์ (รักษาสถานะการเปิด/ปิดโฟลเดอร์ไว้เหมือนเดิม)
 function preserveUIState(oldData, newData) {
    if (!oldData || !newData) return newData;
    if (!newData.years) newData.years = []; 
@@ -3349,12 +3352,12 @@ function preserveUIState(oldData, newData) {
    return newData;
 }
 
-// 4. ⚡ ระบบซิงค์ข้อมูลสด (Live Updates + Red/Green Signal)
+// 4. ⚡ ระบบรับข้อมูลสดจาก Cloud (Live Sync Listener)
 function setupRealtimeSync(uid) {
   updateSyncStatus('syncing');
 
   db.collection('userData').doc(uid).onSnapshot({ includeMetadataChanges: true }, (snapshot) => {
-    // อัปเดตสีสัญญาณไฟ
+    // เช็กว่าโหลดจากเน็ตหรือจากแคชออฟไลน์
     if (snapshot.metadata.fromCache) { updateSyncStatus('offline'); } 
     else { updateSyncStatus('online'); }
 
@@ -3367,7 +3370,7 @@ function setupRealtimeSync(uid) {
     const cloudStr = JSON.stringify(cloudData);
     const localStr = JSON.stringify(data);
     
-    // อัปเดต UI ถ้ามีการเปลี่ยนแปลงมาจากเครื่องอื่น
+    // 🌟 ถ้าระบบเจอว่าข้อมูลบนคลาวด์ "ใหม่กว่า" ข้อมูลในเครื่อง
     if (cloudStr !== lastSavedDataStr && cloudStr !== localStr) {
       const unit = currentUnit();
       const openItemId = unit ? unit._openItem : null;
@@ -3375,7 +3378,7 @@ function setupRealtimeSync(uid) {
 
       let newData = preserveUIState(data, cloudData);
       
-      // กันคลาวด์ทับข้อมูลที่กำลังพิมพ์ (ถ้ากำลังพิมพ์อยู่ จะไม่อัปเดตเนื้อหาจาก Cloud)
+      // 🛑 ถ้าเรา "กำลังพิมพ์" ไฟล์นี้อยู่ ห้ามเอาข้อมูลคลาวด์มาทับเนื้อหาที่เรากำลังพิมพ์!
       if (hasUnsavedChanges && openItemId) {
           const oldItem = unit.summaries.find(s => s.id === openItemId);
           newData.years.forEach(y => {
@@ -3384,19 +3387,20 @@ function setupRealtimeSync(uid) {
                       if (u.id === unit.id) {
                           const newIndex = u.summaries.findIndex(sum => sum.id === openItemId);
                           if (newIndex !== -1 && oldItem) {
-                              u.summaries[newIndex] = oldItem;
+                              u.summaries[newIndex] = oldItem; // คงเนื้อหาในเครื่องเราไว้
                           }
                       }
                   });
               });
           });
-      } else {
-         // ถ้าไม่ได้พิมพ์อะไร ให้รับข้อมูลจาก Cloud มาเต็มๆ
-         data = newData;
-         lastSavedDataStr = JSON.stringify(data);
-         renderSidebar(); 
-         if (!isEditing) { renderContent(); }
       }
+
+      data = newData;
+      lastSavedDataStr = JSON.stringify(data);
+      renderSidebar(); 
+      
+      // อัปเดตหน้าจอเฉพาะตอนที่ไม่ได้เปิดหน้าต่างแก้ไขค้างไว้
+      if (!isEditing) { renderContent(); }
     }
   }, (error) => {
     updateSyncStatus('error');
@@ -3404,37 +3408,41 @@ function setupRealtimeSync(uid) {
   });
 }
 
-// 5. 🤖 Auto-save แบบ Debounce (พิมพ์เสร็จ 2 วินาที อัปขึ้น Cloud ทันที)
+// 5. 🤖 กรณีที่ 2: ระบบ Live Update (Auto-save อัตโนมัติเมื่อหยุดพิมพ์)
 function triggerAutoSave() {
   if (!auth.currentUser || !data) return;
   
-  updateSyncStatus('syncing'); // ขึ้นสถานะกำลังเตรียมเซฟ
+  updateSyncStatus('syncing'); // 🟡 ไฟเหลือง (ตรวจพบการพิมพ์ รอส่งข้อมูล)
   
   clearTimeout(autoSaveTimer);
+  // ตั้งเวลา: พอหยุดพิมพ์ปุ๊บ 0.8 วินาทีให้ดันขึ้น Cloud ทันที (เร็วและเสถียรที่สุด)
   autoSaveTimer = setTimeout(() => {
     const currentDataStr = JSON.stringify(data);
     if (currentDataStr !== lastSavedDataStr) {
         db.collection('userData').doc(auth.currentUser.uid).set({ data: data }).then(() => {
            lastSavedDataStr = currentDataStr;
-           updateSyncStatus('online'); // เซฟเสร็จ ไฟเขียว
+           hasUnsavedChanges = false; // 🟢 กุญแจสำคัญ! ปลดล็อกว่าเซฟเสร็จแล้ว
+           updateSyncStatus('online'); // 🟢 ไฟเขียว
         }).catch(() => {
-           updateSyncStatus('error'); // เซฟพลาด ไฟแดง
+           updateSyncStatus('error'); // 🔴 ไฟแดง
         });
     } else {
-        updateSyncStatus('online'); // ไม่มีอะไรเปลี่ยน ไฟเขียว
+        hasUnsavedChanges = false;
+        updateSyncStatus('online');
     }
-  }, 2000); // ดีเลย์ 2 วินาทีหลังจากพิมพ์ครั้งสุดท้าย
+  }, 800); 
 }
 
-// ดักจับทุกการพิมพ์บนหน้าจอ ให้เรียก Auto-save
+// 🌟 เรดาร์ดักจับทุกการพิมพ์บนหน้าจอให้ทำงานร่วมกับ Live Update
 document.addEventListener('input', (e) => {
+    // ถ้าพิมพ์ในโซน Content หรือแถบ Sidebar ให้สั่ง Auto-save ทันที
     if (e.target.closest('#content') || e.target.closest('#spine')) {
         hasUnsavedChanges = true;
         triggerAutoSave(); 
     }
 });
 
-
+// ลบ setInterval 10 วินาทีทิ้งไปได้เลย เพราะเรดาร์บรรทัดด้านบนทำงานแบบ Real-time แล้ว!
 function showAuthMsg(msg, type) {
   const msgBox = document.getElementById('authMsg');
   let icon = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '⏳';

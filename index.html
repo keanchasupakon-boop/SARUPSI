@@ -3197,16 +3197,24 @@ let savedLogins = [];
 try { savedLogins = JSON.parse(localStorage.getItem('sarupsi_saved_logins')) || []; } catch(e){}
 let activeUser = null; 
 let lastSavedDataStr = ""; 
-let autoSaveTimer = null; // ตัวแปรสำหรับ Debounce Auto-save
+let isSavingToCloud = false; // ป้องกันการส่งข้อมูลทับซ้อนกัน
 
 document.getElementById('app').style.display = 'none';
 
-// 🌟 ดึงหน้า UI ล็อกอินมารอไว้เลย ไม่ต้องรอ Firebase (แก้บั๊กจอขาวตอนเริ่ม)
+// ดึงหน้า UI ล็อกอินมารอไว้เลย
 document.getElementById('authSubtitle').innerText = 'กำลังตรวจสอบสถานะ...';
 if (savedLogins.length > 0) { switchAuthView('profiles'); renderSavedProfiles(); } 
 else { switchAuthView('login'); }
 
-// 📡 ฟังก์ชันควบคุมสีปุ่มสัญญาณ (แดง / เหลือง / เขียว)
+// 🌟 ทำให้ป้าย Live Sync กดเพื่อบังคับ Save ได้ทันที
+const syncBadge = document.getElementById('syncStatusBadge');
+if(syncBadge) {
+   syncBadge.style.cursor = 'pointer';
+   syncBadge.title = 'คลิกเพื่อบังคับบันทึก (Force Save)';
+   syncBadge.onclick = manualSave;
+}
+
+// 📡 ฟังก์ชันควบคุมสีปุ่มสัญญาณ (เขียว / เหลือง / ฟ้า / แดง)
 function updateSyncStatus(status) {
   const badge = document.getElementById('syncStatusBadge');
   const dot = document.getElementById('syncDot');
@@ -3218,46 +3226,32 @@ function updateSyncStatus(status) {
     dot.style.boxShadow = '0 0 8px rgba(16,185,129,0.5)';
     txt.innerText = 'Live Synced';
     txt.style.color = '#10b981';
-    badge.style.borderColor = 'rgba(16,185,129,0.3)';
-    badge.style.background = 'rgba(16,185,129,0.05)';
   } else if(status === 'offline' || status === 'error') {
     dot.style.background = '#ef4444'; 
     dot.style.boxShadow = '0 0 8px rgba(239,68,68,0.5)';
     txt.innerText = 'Offline';
     txt.style.color = '#ef4444';
-    badge.style.borderColor = 'rgba(239,68,68,0.3)';
-    badge.style.background = 'rgba(239,68,68,0.05)';
   } else if(status === 'syncing') {
     dot.style.background = '#f59e0b'; 
     dot.style.boxShadow = '0 0 8px rgba(245,158,11,0.5)';
     txt.innerText = 'Syncing...';
     txt.style.color = '#f59e0b';
-    badge.style.borderColor = 'var(--paper-line)';
-    badge.style.background = 'var(--paper-raised)';
   } else if(status === 'saving') {
     dot.style.background = '#3b82f6'; // สีฟ้า สำหรับ Manual Save
     dot.style.boxShadow = '0 0 8px rgba(59,130,246,0.5)';
-    txt.innerText = 'Saving...';
+    txt.innerText = 'Force Saving...';
     txt.style.color = '#3b82f6';
-    badge.style.borderColor = 'rgba(59,130,246,0.3)';
-    badge.style.background = 'rgba(59,130,246,0.05)';
   }
 }
 
-// 1. 📡 ตัวรับสัญญาณ Cloud (ตอนล็อกอิน)
+// 1. ตัวรับสัญญาณ Cloud (ตอนล็อกอิน)
 auth.onAuthStateChanged((user) => {
   if (user) {
     db.collection('profiles').doc(user.uid).get().then(snap => {
-      // ระบบฟื้นฟูอัตโนมัติ สำหรับยูสเซอร์เก่า
-      if (snap.exists) {
-        activeUser = snap.data();
-      } else {
+      if (snap.exists) { activeUser = snap.data(); } 
+      else {
         const fallbackId = user.email.split('@')[0];
-        activeUser = {
-            id: fallbackId,
-            name: 'User ' + fallbackId,
-            avatar: `https://api.dicebear.com/7.x/micah/svg?seed=${fallbackId}&backgroundColor=fdfbf7`
-        };
+        activeUser = { id: fallbackId, name: 'User ' + fallbackId, avatar: `https://api.dicebear.com/7.x/micah/svg?seed=${fallbackId}&backgroundColor=fdfbf7` };
         db.collection('profiles').doc(user.uid).set(activeUser);
       }
       
@@ -3267,13 +3261,8 @@ auth.onAuthStateChanged((user) => {
 
       db.collection('userData').doc(user.uid).get().then(dataSnap => {
         let cloudData = dataSnap.exists ? dataSnap.data().data : null;
-        
-        if (cloudData !== null) {
-          data = sanitizeData(cloudData);
-        } else {
-          data = { years: [] }; seed(); 
-          db.collection('userData').doc(user.uid).set({ data: data });
-        }
+        if (cloudData !== null) { data = sanitizeData(cloudData); } 
+        else { data = { years: [] }; seed(); db.collection('userData').doc(user.uid).set({ data: data }); }
         
         lastSavedDataStr = JSON.stringify(data);
         
@@ -3282,13 +3271,9 @@ auth.onAuthStateChanged((user) => {
         renderAll();
         
         setupRealtimeSync(user.uid);
-      }).catch(err => {
-        showAuthMsg('ดึงข้อมูลสรุปไม่สำเร็จ: ' + err.message, 'error');
-      });
-
+      }).catch(err => showAuthMsg('ดึงข้อมูลสรุปไม่สำเร็จ: ' + err.message, 'error'));
     }).catch(err => {
       showAuthMsg('ไม่สามารถเข้าถึง Firestore ได้: ' + err.message, 'error');
-      console.error("Firestore Error: ", err);
     });
   } else {
     activeUser = null;
@@ -3299,40 +3284,83 @@ auth.onAuthStateChanged((user) => {
   }
 });
 
+// 🌟 เขียนทับ (Override) ฟังก์ชัน CheckUnsaved ให้เช็กจากสถานะ Cloud โดยตรง (แม่นยำ 100%)
+window.checkUnsaved = function(proceedCallback) {
+  // ถ้าข้อมูลในเครื่อง ตรงกับ คลาวด์เป๊ะๆ ปล่อยผ่านทันที!
+  if (JSON.stringify(data) === lastSavedDataStr) {
+    proceedCallback(); 
+    return;
+  }
+  
+  // ถ้ายังมีค้าง ให้โชว์ Modal
+  let fileName = "ไฟล์ปัจจุบัน";
+  const titleInput = document.getElementById('titleInput');
+  if (titleInput && titleInput.value.trim() !== '') { fileName = titleInput.value.trim(); } 
+  else {
+      const unit = currentUnit();
+      if (unit && unit._openItem) {
+          const item = unit.summaries.find(s => s.id === unit._openItem);
+          if (item && item.title) fileName = item.title;
+      }
+  }
+
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="modal-overlay" id="ovlUnsaved" style="z-index: 10000; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px);">
+      <div class="modal-box" style="width: 360px; text-align: center; border-radius: 20px; padding: 32px 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); background: #fff;">
+        <div style="font-size: 56px; margin-bottom: 12px; line-height: 1;">⚠️</div>
+        <h3 style="margin-bottom: 12px; font-size: 20px; color: #1e293b; font-weight: 700; font-family: 'Inter', 'Kanit', sans-serif;">กำลังส่งข้อมูล!</h3>
+        <p style="font-size: 14.5px; color: #64748b; line-height: 1.6; margin-bottom: 24px; padding: 0 10px; font-family: 'Inter', 'Kanit', sans-serif;">
+          การเปลี่ยนแปลงของ <strong style="color: var(--coral);">"${escapeHtml(fileName)}"</strong><br>ยังซิงค์ขึ้น Cloud ไม่เสร็จ ต้องการบังคับบันทึกก่อนเปลี่ยนหน้าหรือไม่?
+        </p>
+        <div style="display:flex; gap:12px; align-items: center; justify-content: space-between; font-family: 'Inter', 'Kanit', sans-serif;">
+          <button id="usCancel" style="flex:1; background: transparent; border: none; font-size: 14px; font-weight: 600; color: #94a3b8; cursor: pointer;">ยกเลิก</button>
+          <button id="usDiscard" style="flex:1.2; background: #c1584c; border: none; padding: 12px 0; border-radius: 10px; font-size: 14px; font-weight: 600; color: #fff; cursor: pointer;">ไม่บันทึก (ทิ้ง)</button>
+          <button id="usSave" style="flex:1.2; background: #6366f1; border: none; padding: 12px 0; border-radius: 10px; font-size: 14px; font-weight: 600; color: #fff; cursor: pointer; box-shadow: 0 4px 12px rgba(99,102,241,0.3);">บันทึกทันที</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('usCancel').onclick = () => closeModal();
+  document.getElementById('usDiscard').onclick = () => { 
+      data = sanitizeData(JSON.parse(lastSavedDataStr || '{"years":[]}')); // โหลดและซ่อมข้อมูลเก่า
+      closeModal(); proceedCallback(); renderAll();
+  };  
+  document.getElementById('usSave').onclick = () => { manualSave(); closeModal(); setTimeout(proceedCallback, 400); };
+};
+
 // 2. 💾 กรณีที่ 1: ระบบปุ่มบันทึก (Manual Save - บังคับเซฟทันที)
 function manualSave() {
   if (!auth.currentUser || !data) { toast("⚠️ กรุณาเข้าสู่ระบบก่อนบันทึก"); return; }
   
-  // 🛑 หยุดการทำงานของ Auto-save ทันทีเพื่อไม่ให้เซฟซ้ำซ้อน
-  clearTimeout(autoSaveTimer); 
+  isSavingToCloud = true; // บล็อก Auto-save ชั่วคราวไม่ให้ชนกัน
   
   const saveBtn = document.getElementById('saveCloudBtn');
-  if(saveBtn) { saveBtn.innerText = '⏳ กำลังบันทึก...'; saveBtn.style.opacity = '0.7'; }
-  updateSyncStatus('saving'); // 🔵 เปลี่ยนไฟเป็นสีฟ้า (กำลังบังคับเซฟ)
+  if(saveBtn) { saveBtn.innerText = '⏳ บังคับเซฟ...'; saveBtn.style.opacity = '0.7'; }
+  updateSyncStatus('saving'); // เปลี่ยนไฟเป็นสีฟ้า
 
   const currentDataStr = JSON.stringify(data);
   db.collection('userData').doc(auth.currentUser.uid).set({ data: data }).then(() => {
      lastSavedDataStr = currentDataStr; 
      localStorage.setItem('sarupsi_sel', JSON.stringify(sel));
      
-     hasUnsavedChanges = false; // 🟢 ปลดล็อกสถานะ ให้รับข้อมูลใหม่จาก Cloud ได้
-     updateSyncStatus('online'); // 🟢 ไฟเขียว (เซฟเสร็จสมบูรณ์)
-     
+     updateSyncStatus('online'); // ไฟเขียว (เซฟเสร็จ)
      if(saveBtn) { saveBtn.innerText = '✅ บันทึกแล้ว'; saveBtn.style.opacity = '1'; }
      setTimeout(() => { if(saveBtn) saveBtn.innerText = '💾 บันทึก (Save)'; }, 3000);
-     toast("💾 บันทึกข้อมูลเรียบร้อย!");
+     toast("💾 บังคับบันทึกข้อมูลสำเร็จ!");
+     
+     isSavingToCloud = false; // ปลดล็อก
   }).catch(err => {
      toast("❌ บันทึกไม่สำเร็จ: " + err.message);
-     updateSyncStatus('error'); // 🔴 ไฟแดง (เกิดข้อผิดพลาด)
+     updateSyncStatus('error'); 
      if(saveBtn) { saveBtn.innerText = '💾 บันทึก (Save)'; saveBtn.style.opacity = '1'; }
+     isSavingToCloud = false;
   });
 }
 
-// 3. 🛡️ ฟังก์ชันแยกหน้าจอเวลาซิงค์ (รักษาสถานะการเปิด/ปิดโฟลเดอร์ไว้เหมือนเดิม)
 function preserveUIState(oldData, newData) {
    if (!oldData || !newData) return newData;
    if (!newData.years) newData.years = []; 
-   
    newData.years.forEach(newY => {
       const oldY = oldData.years.find(y => y.id === newY.id);
       if (oldY && oldY.open !== undefined) newY.open = oldY.open;
@@ -3352,12 +3380,11 @@ function preserveUIState(oldData, newData) {
    return newData;
 }
 
-// 4. ⚡ ระบบรับข้อมูลสดจาก Cloud (Live Sync Listener)
+// 3. ⚡ ระบบรับข้อมูลสดจาก Cloud (Live Sync Listener)
 function setupRealtimeSync(uid) {
   updateSyncStatus('syncing');
 
   db.collection('userData').doc(uid).onSnapshot({ includeMetadataChanges: true }, (snapshot) => {
-    // เช็กว่าโหลดจากเน็ตหรือจากแคชออฟไลน์
     if (snapshot.metadata.fromCache) { updateSyncStatus('offline'); } 
     else { updateSyncStatus('online'); }
 
@@ -3370,79 +3397,76 @@ function setupRealtimeSync(uid) {
     const cloudStr = JSON.stringify(cloudData);
     const localStr = JSON.stringify(data);
     
-    // 🌟 ถ้าระบบเจอว่าข้อมูลบนคลาวด์ "ใหม่กว่า" ข้อมูลในเครื่อง
+    // ถ้าระบบเจอว่าข้อมูลบนคลาวด์ "เปลี่ยนไปจากในเครื่อง"
     if (cloudStr !== lastSavedDataStr && cloudStr !== localStr) {
-      const unit = currentUnit();
-      const openItemId = unit ? unit._openItem : null;
-      const isEditing = !!openItemId;
+      
+      // ตรวจจับว่าผู้ใช้ "กำลังพิมพ์" หรือคลิกแก้ในจออยู่หรือไม่
+      const activeEl = document.activeElement;
+      const isUserBusy = activeEl && (activeEl.isContentEditable || activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
 
       let newData = preserveUIState(data, cloudData);
       
-      // 🛑 ถ้าเรา "กำลังพิมพ์" ไฟล์นี้อยู่ ห้ามเอาข้อมูลคลาวด์มาทับเนื้อหาที่เรากำลังพิมพ์!
-      if (hasUnsavedChanges && openItemId) {
-          const oldItem = unit.summaries.find(s => s.id === openItemId);
-          newData.years.forEach(y => {
-              y.subjects && y.subjects.forEach(s => {
-                  s.units && s.units.forEach(u => {
-                      if (u.id === unit.id) {
-                          const newIndex = u.summaries.findIndex(sum => sum.id === openItemId);
-                          if (newIndex !== -1 && oldItem) {
-                              u.summaries[newIndex] = oldItem; // คงเนื้อหาในเครื่องเราไว้
+      if (isUserBusy) {
+          // ดึงเนื้อหาปัจจุบันที่กำลังแก้ ไปอุดไว้ใน newData ป้องกันโดนข้อมูลอื่นทับ
+          const unit = currentUnit();
+          if (unit && unit._openItem) {
+              const oldItem = unit.summaries.find(s => s.id === unit._openItem);
+              newData.years.forEach(y => {
+                  y.subjects && y.subjects.forEach(s => {
+                      s.units && s.units.forEach(u => {
+                          if (u.id === unit.id) {
+                              const newIndex = u.summaries.findIndex(sum => sum.id === unit._openItem);
+                              if (newIndex !== -1 && oldItem) {
+                                  u.summaries[newIndex] = oldItem; // ทับด้วยงานที่เรากำลังทำอยู่
+                              }
                           }
-                      }
+                      });
                   });
               });
-          });
+          }
+          data = newData;
+          lastSavedDataStr = JSON.stringify(data);
+          renderSidebar(); 
+      } else {
+          // 🌟 ถ้าไม่ได้พิมพ์อะไรเลย ให้ดึง Cloud มารีเฟรช "ทั้งจอ" ทันที (แก้ปัญหาลบแล้วจออีกเครื่องไม่หาย)
+          data = newData;
+          lastSavedDataStr = JSON.stringify(data);
+          renderAll(); 
       }
-
-      data = newData;
-      lastSavedDataStr = JSON.stringify(data);
-      renderSidebar(); 
-      
-      // อัปเดตหน้าจอเฉพาะตอนที่ไม่ได้เปิดหน้าต่างแก้ไขค้างไว้
-      if (!isEditing) { renderContent(); }
     }
   }, (error) => {
     updateSyncStatus('error');
-    console.error("Error listening to Firestore: ", error);
   });
 }
 
-// 5. 🤖 กรณีที่ 2: ระบบ Live Update (Auto-save อัตโนมัติเมื่อหยุดพิมพ์)
-function triggerAutoSave() {
-  if (!auth.currentUser || !data) return;
-  
-  updateSyncStatus('syncing'); // 🟡 ไฟเหลือง (ตรวจพบการพิมพ์ รอส่งข้อมูล)
-  
-  clearTimeout(autoSaveTimer);
-  // ตั้งเวลา: พอหยุดพิมพ์ปุ๊บ 0.8 วินาทีให้ดันขึ้น Cloud ทันที (เร็วและเสถียรที่สุด)
-  autoSaveTimer = setTimeout(() => {
-    const currentDataStr = JSON.stringify(data);
-    if (currentDataStr !== lastSavedDataStr) {
-        db.collection('userData').doc(auth.currentUser.uid).set({ data: data }).then(() => {
-           lastSavedDataStr = currentDataStr;
-           hasUnsavedChanges = false; // 🟢 กุญแจสำคัญ! ปลดล็อกว่าเซฟเสร็จแล้ว
-           updateSyncStatus('online'); // 🟢 ไฟเขียว
-        }).catch(() => {
-           updateSyncStatus('error'); // 🔴 ไฟแดง
-        });
-    } else {
-        hasUnsavedChanges = false;
-        updateSyncStatus('online');
-    }
-  }, 800); 
-}
+// 4. 🚀 THE BLAZING FAST 0.5s DEEP WATCHER 🚀
+// ลบความซับซ้อนทิ้ง! เปลี่ยนมาใช้การสแกนจับการเปลี่ยนแปลง "ทุกแอคชัน" บนหน้าจอแบบ 0.5 วินาที
+if(window.autoSaveInterval) clearInterval(window.autoSaveInterval);
 
-// 🌟 เรดาร์ดักจับทุกการพิมพ์บนหน้าจอให้ทำงานร่วมกับ Live Update
-document.addEventListener('input', (e) => {
-    // ถ้าพิมพ์ในโซน Content หรือแถบ Sidebar ให้สั่ง Auto-save ทันที
-    if (e.target.closest('#content') || e.target.closest('#spine')) {
-        hasUnsavedChanges = true;
-        triggerAutoSave(); 
-    }
-});
+window.autoSaveInterval = setInterval(() => {
+   if (!auth.currentUser || !data || isSavingToCloud) return;
+   
+   const currentDataStr = JSON.stringify(data);
+   
+   // ถ้าระบบตรวจพบความเปลี่ยนแปลงจากในเครื่อง (กดปุ่มสร้างโฟลเดอร์, พิมพ์โน้ต, ลบไฟล์ ฯลฯ)
+   if (currentDataStr !== lastSavedDataStr) {
+       isSavingToCloud = true;
+       updateSyncStatus('syncing'); // 🟡 ไฟเหลือง
+       
+       db.collection('userData').doc(auth.currentUser.uid).set({ data: data })
+       .then(() => {
+          lastSavedDataStr = currentDataStr;
+          updateSyncStatus('online'); // 🟢 ไฟเขียว ทำงานเสร็จในเสี้ยววินาที!
+          isSavingToCloud = false;
+       })
+       .catch(() => {
+          updateSyncStatus('error'); // 🔴 ไฟแดงเน็ตมีปัญหา
+          isSavingToCloud = false;
+       });
+   }
+}, 500); // เช็กโค้ดและส่งขึ้นคลาวด์ทุก 0.5 วินาที
 
-// ลบ setInterval 10 วินาทีทิ้งไปได้เลย เพราะเรดาร์บรรทัดด้านบนทำงานแบบ Real-time แล้ว!
+// (ฟังก์ชัน Auth ทั้งหมดอยู่คงเดิม ไม่ต้องแก้ไข)
 function showAuthMsg(msg, type) {
   const msgBox = document.getElementById('authMsg');
   let icon = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '⏳';
